@@ -99,21 +99,54 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputPr
     }
 
     try {
-      const abortController = new AbortController();
-      const timeoutId = setTimeout(() => abortController.abort(), 8000); // 8-second timeout
+      let data: any = null;
 
-      const { data, error: fetchError } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('code', key)
-        .eq('is_active', true)
-        .maybeSingle()
-        .abortSignal(abortController.signal);
+      try {
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 8000); // 8-second timeout
 
-      clearTimeout(timeoutId);
+        const { data: dbData, error: fetchError } = await supabase
+          .from('coupons')
+          .select('*')
+          .eq('code', key)
+          .eq('is_active', true)
+          .maybeSingle()
+          .abortSignal(abortController.signal);
 
-      if (fetchError) {
-        throw fetchError;
+        clearTimeout(timeoutId);
+
+        if (fetchError) {
+          throw fetchError;
+        }
+        data = dbData;
+      } catch (err) {
+        console.warn('DB fetch failed, will attempt local fallback', err);
+      }
+
+      // Local storage fallback for un-migrated DBs or locally saved coupons
+      if (!data) {
+        try {
+          const raw = localStorage.getItem('switch_admin_marketing');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed.coupons) {
+              const localCoupon = parsed.coupons.find((c: any) => c.code.toUpperCase() === key && c.status === 'active');
+              if (localCoupon) {
+                data = {
+                  code: localCoupon.code,
+                  discount_type: localCoupon.type === 'percentage' ? 'percentage' : 'flat',
+                  discount_value: Number(String(localCoupon.discount).replace(/[^\d.]/g, '')) || 0,
+                  min_order_amount: Number(localCoupon.minOrder) || 0,
+                  max_uses: Number(localCoupon.usageLimit) || 0,
+                  current_uses: Number(localCoupon.used) || 0,
+                  expires_at: localCoupon.expiresAt ? new Date(`${localCoupon.expiresAt}T23:59:59`).toISOString() : null,
+                };
+              }
+            }
+          }
+        } catch (localErr) {
+          console.error('Local fallback error', localErr);
+        }
       }
 
       if (!data) {
@@ -166,12 +199,12 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputPr
       if (errorObj?.name === 'AbortError' || errorObj?.message?.includes('FetchError') || errorObj?.message?.includes('timed out')) {
         setError('Network issue while verifying coupon');
         toast({ title: 'Connection Timeout', description: 'Could not verify coupon. Please check your connection.', variant: 'destructive' });
-      } else if (errorObj?.code === '42P01' || errorObj?.message?.includes('relation "public.coupons" does not exist')) {
+      } else if (errorObj?.code === '42P01' || errorObj?.message?.includes('relation "public.coupons" does not exist') || errorObj?.code === '404') {
         setError('Coupons not configured on server');
         toast({ title: 'System Error', description: 'Coupon system is currently unavailable.', variant: 'destructive' });
       } else {
         setError('Failed to verify coupon code');
-        toast({ title: 'Verification Failed', description: 'An unexpected error occurred while verifying the coupon.', variant: 'destructive' });
+        toast({ title: 'Verification Failed', description: 'Invalid or unrecognized coupon code.', variant: 'destructive' });
       }
     } finally {
       setIsLoading(false);
