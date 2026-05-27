@@ -99,41 +99,22 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputPr
     }
 
     try {
-      let data: any = null;
-      let fetchError: any = null;
-      let retries = 2;
-      
-      while (retries >= 0) {
-        try {
-          const fetchPromise = supabase
-            .from('coupons')
-            .select('*')
-            .eq('code', key)
-            .eq('is_active', true)
-            .maybeSingle();
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 8000); // 8-second timeout
 
-          const res = await Promise.race([
-            fetchPromise,
-            new Promise<{ data: any; error: any }>((_, reject) => 
-              setTimeout(() => reject(new Error('Request timed out')), 6000)
-            )
-          ]);
-          
-          if (res.error) throw res.error;
-          data = res.data;
-          fetchError = null;
-          break; // success
-        } catch (err: any) {
-          if (err.message === 'Request timed out' && retries > 0) {
-            retries--;
-            continue;
-          }
-          fetchError = err;
-          break;
-        }
+      const { data, error: fetchError } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', key)
+        .eq('is_active', true)
+        .maybeSingle()
+        .abortSignal(abortController.signal);
+
+      clearTimeout(timeoutId);
+
+      if (fetchError) {
+        throw fetchError;
       }
-
-      if (fetchError) throw fetchError;
 
       if (!data) {
         couponCache.current[key] = null;
@@ -180,16 +161,17 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputPr
       });
     } catch (err: unknown) {
       console.error('Error applying coupon:', err);
-      const error = err as { message?: string; code?: string };
+      const errorObj = err as any;
 
-      if (error?.message?.includes('Request timed out')) {
-        setError('Connection timed out. Please try again.');
-        toast({ title: 'Connection Error', description: 'Request timed out while verifying coupon.', variant: 'destructive' });
-      } else if (error?.code === '42P01' || error?.message?.includes('relation "public.coupons" does not exist')) {
-        setError('Coupons not configured on server.');
-        toast({ title: 'Database Error', description: 'Coupons table missing. Please run database migrations.', variant: 'destructive' });
+      if (errorObj?.name === 'AbortError' || errorObj?.message?.includes('FetchError') || errorObj?.message?.includes('timed out')) {
+        setError('Network issue while verifying coupon');
+        toast({ title: 'Connection Timeout', description: 'Could not verify coupon. Please check your connection.', variant: 'destructive' });
+      } else if (errorObj?.code === '42P01' || errorObj?.message?.includes('relation "public.coupons" does not exist')) {
+        setError('Coupons not configured on server');
+        toast({ title: 'System Error', description: 'Coupon system is currently unavailable.', variant: 'destructive' });
       } else {
-        setError('Failed to apply promo code');
+        setError('Failed to verify coupon code');
+        toast({ title: 'Verification Failed', description: 'An unexpected error occurred while verifying the coupon.', variant: 'destructive' });
       }
     } finally {
       setIsLoading(false);

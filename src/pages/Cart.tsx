@@ -11,9 +11,13 @@ const Cart = () => {
   const { isAuthenticated, isAuthReady } = useAuth();
 
   const estimatedTax = Math.round(items.reduce((acc, item) => {
-    const rate = item.product.price <= 2500 ? 0.05 : 0.18;
+    const rate = item.product.price <= 1000 ? 0.05 : 0.12;
     return acc + (item.product.price * item.quantity * rate);
   }, 0));
+
+  const has5Percent = items.some(item => item.product.price <= 1000);
+  const has12Percent = items.some(item => item.product.price > 1000);
+  const taxLabel = `Estimated GST (${has5Percent && has12Percent ? '5-12%' : has12Percent ? '12%' : '5%'})`;
 
   if (isAuthReady && !isAuthenticated) {
     return <Navigate to="/auth" replace />;
@@ -91,7 +95,7 @@ const Cart = () => {
               <div className="mt-5 space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatPrice(totalPrice)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Shipping</span><span className="text-emerald-600">Included</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Estimated tax</span><span>{formatPrice(estimatedTax)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{taxLabel}</span><span>{formatPrice(estimatedTax)}</span></div>
                 <div className="border-t border-border pt-3">
                   <div className="flex justify-between text-lg font-semibold">
                     <span>Total</span>

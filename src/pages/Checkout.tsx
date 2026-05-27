@@ -42,6 +42,7 @@ interface SummaryProps {
   items: CheckoutCartItem[];
   totalPrice: number;
   tax: number;
+  taxLabel?: string;
   grandTotal: number;
   couponDiscount: number;
   appliedCoupon: CouponData | null;
@@ -60,6 +61,7 @@ const OrderSummary = ({
   items,
   totalPrice,
   tax,
+  taxLabel = 'Tax',
   grandTotal,
   couponDiscount,
   appliedCoupon,
@@ -105,7 +107,7 @@ const OrderSummary = ({
         </div>
       )}
       <div className="flex justify-between"><span className="text-muted-foreground">Shipping</span><span className="text-emerald-600">Included</span></div>
-      <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>{formatPrice(tax)}</span></div>
+      <div className="flex justify-between"><span className="text-muted-foreground">{taxLabel}</span><span>{formatPrice(tax)}</span></div>
       {walletApplied > 0 && (
         <div className="flex justify-between text-foreground">
           <span className="text-muted-foreground">Wallet applied</span>
@@ -248,6 +250,9 @@ const Checkout = () => {
     : estimatedTax;
 
   const tax = Math.round(finalTax * 100) / 100;
+  const has5Percent = items.some(item => item.product.price <= 1000);
+  const has12Percent = items.some(item => item.product.price > 1000);
+  const taxLabel = `GST (${has5Percent && has12Percent ? '5-12%' : has12Percent ? '12%' : '5%'})`;
   const grandTotal = totalPrice - couponDiscount + shipping + tax;
   const maxWalletPossible = Math.min(walletBalance, Math.max(grandTotal, 0));
   const walletApplied = useWallet ? maxWalletPossible : 0;
@@ -569,6 +574,7 @@ const Checkout = () => {
                   items={items as CheckoutCartItem[]}
                   totalPrice={totalPrice}
                   tax={tax}
+                  taxLabel={taxLabel}
                   grandTotal={grandTotal}
                   couponDiscount={couponDiscount}
                   appliedCoupon={appliedCoupon}
@@ -720,6 +726,7 @@ const Checkout = () => {
                   items={items as CheckoutCartItem[]}
                   totalPrice={totalPrice}
                   tax={tax}
+                  taxLabel={taxLabel}
                   grandTotal={grandTotal}
                   couponDiscount={couponDiscount}
                   appliedCoupon={appliedCoupon}
