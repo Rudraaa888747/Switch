@@ -90,7 +90,7 @@ const ProductCard = ({ product, index = 0 }: ProductCardProps) => {
       <motion.article
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: '-24px' }}
+        viewport={{ once: true, amount: 0.05 }}
         transition={{ duration: 0.48, delay: index * 0.06, ease: premiumEase }}
         whileHover={{ y: -6 }}
         className="product-card-premium group h-full"

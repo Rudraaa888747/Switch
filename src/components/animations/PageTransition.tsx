@@ -76,7 +76,7 @@ export const ScrollReveal = ({
         x: 0, 
         y: 0 
       }}
-      viewport={{ once: true, margin: '-50px' }}
+      viewport={{ once: true, amount: 0.05 }}
       transition={{ 
         duration: 0.6, 
         delay, 
@@ -103,7 +103,7 @@ export const StaggerContainer = ({
       className={className}
       initial="hidden"
       whileInView="visible"
-      viewport={{ once: true, margin: '-50px' }}
+      viewport={{ once: true, amount: 0.05 }}
       variants={{
         hidden: { opacity: 0 },
         visible: {
