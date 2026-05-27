@@ -54,6 +54,15 @@ const ProductDetail = () => {
 
   const inWishlist = product ? isInWishlist(product.id) : false;
 
+  // Ensure any mobile scroll-lock state from overlays is cleared when entering the product page
+  useEffect(() => {
+    document.body.dataset.mobileMenu = 'closed';
+    document.body.style.overflow = '';
+    document.body.style.touchAction = '';
+    document.documentElement.style.overflow = '';
+    document.documentElement.style.touchAction = '';
+  }, [id]);
+
   useEffect(() => {
     if (id) trackBehavior(id, 'view');
   }, [id, trackBehavior]);
@@ -163,7 +172,7 @@ const ProductDetail = () => {
                     <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Image unavailable</span>
                   </div>
                 ) : (
-                  <img key={activeImage} src={activeImage || '/placeholder.svg'} alt={product.name} className="h-full w-full object-contain object-center p-6 transition-transform duration-1000 group-hover:scale-[1.04] md:p-8" loading="eager" onError={() => setImgError(true)} />
+                  <img key={activeImage} src={activeImage || '/placeholder.svg'} alt={product.name} className="h-full w-full object-cover object-[center_top] transition-transform duration-1000 group-hover:scale-[1.05]" loading="eager" onError={() => setImgError(true)} />
                 )}
               </div>
 
@@ -207,7 +216,7 @@ const ProductDetail = () => {
                     }`}
                   >
                         <div className="theme-image-stage h-full w-full">
-                          <img src={image} alt={product.name} className="h-full w-full object-contain p-2 transition-transform duration-300 hover:scale-105" loading="lazy" />
+                          <img src={image} alt={product.name} className="h-full w-full object-cover object-[center_top] transition-transform duration-300 hover:scale-105" loading="lazy" />
                         </div>
                   </button>
                 ))}
@@ -243,13 +252,13 @@ const ProductDetail = () => {
               </div>
             </div>
 
-            <div className="theme-surface rounded-[1.6rem] p-6">
+            <div className="pt-4">
               <div className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b border-border/70 pb-5">
                 <div>
-                  <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">Configure your fit</p>
-                  <h2 className="mt-2 text-xl font-semibold">Select finish, size and quantity</h2>
+                  <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-foreground">Configure Fit</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Select finish, size and quantity</p>
                 </div>
-                <div className="rounded-full bg-muted px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                <div className="rounded-full bg-foreground/5 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-foreground">
                   Ready to ship
                 </div>
               </div>
@@ -367,22 +376,40 @@ const ProductDetail = () => {
                     )}
                   </div>
                 ) : (
-              <div className="theme-surface grid gap-4 rounded-[1.35rem] p-5 sm:grid-cols-2">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Fabric</p>
-                      <p className="mt-1 font-medium">{product.fabric}</p>
+                  <div className="space-y-6">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Fabric</p>
+                        <p className="mt-1 font-medium">{product.fabric}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Occasion</p>
+                        <p className="mt-1 font-medium">{product.occasion.join(', ')}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Category</p>
+                        <p className="mt-1 font-medium capitalize">{product.category}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Brand</p>
+                        <p className="mt-1 font-medium">{product.brand || 'Premium'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Occasion</p>
-                      <p className="mt-1 font-medium">{product.occasion.join(', ')}</p>
+                    
+                    <div className="border-t border-border pt-6">
+                      <h4 className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Model Details</h4>
+                      <p className="text-sm">Model is 6'1" (185 cm) and wears a size L.</p>
+                      <p className="mt-2 text-sm text-muted-foreground">Garment fits true to size. For an oversized fit, we recommend sizing up.</p>
                     </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Category</p>
-                      <p className="mt-1 font-medium capitalize">{product.category}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Brand</p>
-                      <p className="mt-1 font-medium">{product.brand || 'Premium'}</p>
+                    
+                    <div className="border-t border-border pt-6">
+                      <h4 className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Material & Care</h4>
+                      <ul className="list-inside list-disc space-y-1 text-sm">
+                        <li>100% Premium {product.fabric || 'Cotton'}</li>
+                        <li>Heavyweight construction</li>
+                        <li>Machine wash cold inside out</li>
+                        <li>Do not tumble dry</li>
+                      </ul>
                     </div>
                   </div>
                 )}
@@ -426,23 +453,18 @@ const ProductDetail = () => {
       </div>
 
       {isMobile && (
-        <div className="sticky-mobile-bottom px-3">
-          <div className="mobile-glass-panel rounded-[1.7rem] px-4 py-3 safe-bottom">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">{selectedSize ? `Size ${selectedSize}` : 'Select your size'}</p>
-                <p className="mt-1 text-lg font-semibold">{formatPrice(product.price)}</p>
-              </div>
-              <button onClick={handleWishlistToggle} className={`flex h-11 w-11 items-center justify-center rounded-full border ${inWishlist ? 'border-primary bg-primary text-primary-foreground' : 'border-foreground/10 bg-background/60 text-foreground'}`}>
-                <Heart size={18} className={inWishlist ? 'fill-current' : ''} />
-              </button>
+        <div className="sticky-mobile-bottom px-4 pb-4">
+          <div className="mobile-glass-panel flex items-center justify-between rounded-full bg-background/80 px-6 py-4 shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur-2xl border border-border/50">
+            <div className="flex flex-col">
+              <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{selectedSize ? `Size ${selectedSize}` : 'Select Size'}</span>
+              <span className="text-base font-semibold">{formatPrice(product.price)}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={handleAddToCart} className="btn-outline px-4 py-3 text-[10px]">
-                Add to Cart
+            <div className="flex items-center gap-2">
+              <button onClick={handleWishlistToggle} className="flex h-10 w-10 items-center justify-center rounded-full border border-border/50">
+                <Heart size={16} className={inWishlist ? 'fill-foreground' : ''} />
               </button>
-              <button onClick={handleBuyNow} className="btn-primary px-4 py-3 text-[10px]">
-                Buy Now
+              <button onClick={handleAddToCart} className="btn-primary rounded-full px-6 py-3.5 text-[10px]">
+                Add to Cart
               </button>
             </div>
           </div>

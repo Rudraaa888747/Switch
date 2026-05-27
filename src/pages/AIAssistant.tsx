@@ -1,12 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Send, 
-  Sparkles, 
-  User, 
-  Mic, 
-  Image,
+import {
+  Send,
+  User,
   Loader2,
+  ArrowUp,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAIChat } from '@/hooks/useAIChat';
@@ -23,18 +21,32 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+const premiumEase = [0.25, 0.1, 0.25, 1] as const;
+
+// Editorial fashion suggestion pills
+const suggestedQueries = [
+  'BLACK ESSENTIALS',
+  'OFFICE MINIMAL',
+  'AFTER DARK',
+  'SUMMER LUXURY',
+  'TRENDING NOW',
+  'CLEAN STREETWEAR',
+];
+
 const AIAssistant = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
       type: 'ai',
-      content: "Hi! I'm your Switch AI Assistant. 👋 Tell me what you're looking for, and I'll help you find the perfect outfit. You can ask me about products, get style tips, or fashion advice!",
+      content:
+        "Welcome. I'm your personal style concierge.\n\nTell me what you're dressing for — and I'll curate something exceptional.",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [pendingProductIds, setPendingProductIds] = useState<string[]>([]);
+  const [isFocused, setIsFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { sendMessage, isLoading } = useAIChat();
@@ -122,7 +134,7 @@ const AIAssistant = () => {
         setMessages(prev => [...prev, {
           id: (Date.now() + 1).toString(),
           type: 'ai',
-          content: cleanText || "I couldn't process that. Please try asking about our products, styles, or fashion tips!",
+          content: cleanText || "Let me refine that for you — try describing an occasion, mood, or aesthetic.",
           productIds: ids,
           timestamp: new Date(),
         }]);
@@ -133,208 +145,251 @@ const AIAssistant = () => {
     );
   };
 
-  const suggestedQueries = [
-    "Show me black shirts",
-    "Casual outfit ideas",
-    "What's trending?",
-    "Office wear suggestions",
-  ];
-
   return (
-      <div className="h-[calc(100vh-5rem)] flex flex-col">
-        {/* Header */}
-        <div className="border-b border-border bg-card">
-          <div className="container-custom py-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold">AI Shopping Assistant</h1>
-                <p className="text-sm text-muted-foreground">Powered by Gemini AI</p>
-              </div>
+    <div className="flex h-[calc(100vh-5rem)] flex-col overflow-hidden">
+
+      {/* ── Luxury Header ── */}
+      <div className="relative shrink-0 border-b border-border/30 bg-background/60 backdrop-blur-2xl">
+        {/* ambient top glow */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-foreground/20 to-transparent" />
+        <div className="container-custom py-5">
+          <div className="flex items-center gap-4">
+            {/* Minimal luxury AI avatar */}
+            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/50 bg-background/80">
+              <div className="absolute inset-0 rounded-full bg-foreground/[0.04]" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="relative z-10 text-foreground">
+                <path d="M12 2L9.5 9.5L2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5L12 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              </svg>
+              {/* subtle pulse ring */}
+              <motion.div
+                className="absolute inset-0 rounded-full border border-foreground/20"
+                animate={{ scale: [1, 1.18, 1], opacity: [0.4, 0, 0.4] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            </div>
+
+            <div>
+              <h1 className="text-sm font-semibold uppercase tracking-[0.18em]">Style Concierge</h1>
+              <p className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-muted-foreground/55">
+                SWITCH Intelligence
+              </p>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="container-custom py-6 space-y-6">
-            <AnimatePresence>
-              {messages.map((message) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex gap-4 ${message.type === 'user' ? 'flex-row-reverse' : ''}`}
-                >
-                  <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center ${
-                    message.type === 'ai' 
-                      ? 'bg-gradient-to-br from-primary to-accent' 
-                      : 'bg-muted'
+      {/* ── Messages ── */}
+      <div className="custom-scrollbar flex-1 overflow-y-auto overscroll-contain">
+        <div className="container-custom space-y-7 py-8">
+          <AnimatePresence initial={false}>
+            {messages.map((message, i) => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: premiumEase, delay: i === 0 ? 0 : 0 }}
+                className={`flex gap-3 ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+              >
+                {/* Avatar */}
+                <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+                  message.type === 'ai'
+                    ? 'border-border/40 bg-background/60'
+                    : 'border-border/30 bg-foreground/[0.06]'
+                }`}>
+                  {message.type === 'ai' ? (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="text-foreground/80">
+                      <path d="M12 2L9.5 9.5L2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5L12 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                    </svg>
+                  ) : (
+                    <User className="h-3.5 w-3.5 text-foreground/60" />
+                  )}
+                </div>
+
+                {/* Bubble */}
+                <div className={`flex max-w-[82%] flex-col sm:max-w-xl ${message.type === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`rounded-2xl px-5 py-3.5 text-sm leading-relaxed ${
+                    message.type === 'user'
+                      ? 'rounded-tr-sm bg-foreground text-background'
+                      : 'rounded-tl-sm border border-border/40 bg-card/60 backdrop-blur-sm text-foreground/90'
                   }`}>
-                    {message.type === 'ai' ? (
-                      <Sparkles className="w-5 h-5 text-primary-foreground" />
-                    ) : (
-                      <User className="w-5 h-5" />
-                    )}
+                    <p className="whitespace-pre-line">{message.content}</p>
                   </div>
 
-                  <div className={`flex-1 max-w-2xl ${message.type === 'user' ? 'text-right' : ''}`}>
-                    <div className={`inline-block p-4 rounded-2xl ${
-                      message.type === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-tr-none'
-                        : 'bg-card border border-border rounded-tl-none'
-                    }`}>
-                      <p className="whitespace-pre-line">{message.content}</p>
-                    </div>
-
-                    {message.products && message.products.length > 0 && (
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {message.products.map((product) => (
-                          <Link
-                            key={product.id}
-                            to={`/product/${product.id}`}
-                            className="block bg-card rounded-xl border border-border overflow-hidden hover:border-primary/50 transition-colors group"
-                          >
-                            <div className="aspect-square overflow-hidden">
-                              <img
-                                src={getProductImage(product)}
-                                alt={product.name}
-                                loading="lazy"
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                onError={(e) => {
-                                  e.currentTarget.src = '/placeholder.svg';
-                                }}
-                              />
+                  {/* Product cards */}
+                  {message.products && message.products.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, ease: premiumEase, delay: 0.1 }}
+                      className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-2"
+                    >
+                      {message.products.map((product) => (
+                        <Link
+                          key={product.id}
+                          to={`/product/${product.id}`}
+                          className="group block overflow-hidden rounded-xl border border-border/40 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:border-foreground/20 hover:shadow-lg hover:shadow-foreground/5"
+                        >
+                          <div className="aspect-[3/4] overflow-hidden bg-muted/30">
+                            <img
+                              src={getProductImage(product)}
+                              alt={product.name}
+                              loading="lazy"
+                              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                              onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
+                            />
+                          </div>
+                          <div className="p-3">
+                            <h4 className="line-clamp-1 text-xs font-medium tracking-wide">{product.name}</h4>
+                            <div className="mt-1.5 flex items-baseline gap-2">
+                              <span className="text-xs font-semibold">{formatPrice(product.price)}</span>
+                              {product.originalPrice && (
+                                <span className="text-[10px] text-muted-foreground/60 line-through">
+                                  {formatPrice(product.originalPrice)}
+                                </span>
+                              )}
                             </div>
-                            <div className="p-3">
-                              <h4 className="font-medium text-sm line-clamp-1 mb-1">{product.name}</h4>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-sm">{formatPrice(product.price)}</span>
-                                {product.originalPrice && (
-                                  <span className="text-xs text-muted-foreground line-through">
-                                    {formatPrice(product.originalPrice)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
+                          </div>
+                        </Link>
+                      ))}
+                    </motion.div>
+                  )}
 
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-
-            {/* Streaming Response */}
-            {streamingText && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-4"
-              >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-primary-foreground" />
-                </div>
-                <div className="p-4 bg-card border border-border rounded-2xl rounded-tl-none">
-                  <p className="whitespace-pre-line">{streamingText}</p>
+                  <p className="mt-2 text-[10px] tracking-wide text-muted-foreground/35">
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 </div>
               </motion.div>
-            )}
+            ))}
+          </AnimatePresence>
 
-            {/* Loading Indicator */}
-            {isLoading && !streamingText && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-4"
-              >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-primary-foreground" />
-                </div>
-                <div className="p-4 bg-card border border-border rounded-2xl rounded-tl-none">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              </motion.div>
-            )}
+          {/* Streaming Response */}
+          {streamingText && (
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: premiumEase }}
+              className="flex gap-3"
+            >
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/40 bg-background/60">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="text-foreground/80">
+                  <path d="M12 2L9.5 9.5L2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5L12 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div className="rounded-2xl rounded-tl-sm border border-border/40 bg-card/60 px-5 py-3.5 backdrop-blur-sm">
+                <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">{streamingText}</p>
+              </div>
+            </motion.div>
+          )}
 
-            <div ref={messagesEndRef} />
-          </div>
+          {/* Thinking indicator */}
+          {isLoading && !streamingText && (
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: premiumEase }}
+              className="flex gap-3"
+            >
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/40 bg-background/60">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="text-foreground/80">
+                  <path d="M12 2L9.5 9.5L2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5L12 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-sm border border-border/40 bg-card/60 px-5 py-4 backdrop-blur-sm">
+                {[0, 0.18, 0.36].map((delay, i) => (
+                  <motion.div
+                    key={i}
+                    className="h-1.5 w-1.5 rounded-full bg-foreground/30"
+                    animate={{ opacity: [0.3, 1, 0.3], scale: [0.9, 1.1, 0.9] }}
+                    transition={{ duration: 1.1, repeat: Infinity, delay, ease: 'easeInOut' }}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          <div ref={messagesEndRef} />
         </div>
+      </div>
 
-        {/* Suggested Queries */}
+      {/* ── Editorial Suggestion Pills ── */}
+      <AnimatePresence>
         {messages.length === 1 && (
-          <div className="border-t border-border bg-card/50">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.4, ease: premiumEase }}
+            className="shrink-0 border-t border-border/20 bg-background/40 backdrop-blur-xl"
+          >
             <div className="container-custom py-4">
-              <p className="text-sm text-muted-foreground mb-3">Try asking:</p>
+              <p className="mb-3 text-[10px] uppercase tracking-[0.22em] text-muted-foreground/45">
+                Curated prompts
+              </p>
               <div className="flex flex-wrap gap-2">
-                {suggestedQueries.map((query) => (
-                  <button
+                {suggestedQueries.map((query, i) => (
+                  <motion.button
                     key={query}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, ease: premiumEase, delay: i * 0.04 }}
                     onClick={() => {
                       setInput(query);
                       inputRef.current?.focus();
                     }}
-                    className="px-4 py-2 bg-muted rounded-full text-sm hover:bg-muted/80 transition-colors"
+                    className="rounded-full border border-border/40 bg-background/50 px-4 py-1.5 text-[10px] uppercase tracking-[0.18em] text-foreground/55 backdrop-blur-sm transition-all duration-300 hover:border-foreground/25 hover:bg-foreground/[0.06] hover:text-foreground/80"
                   >
                     {query}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
+      </AnimatePresence>
 
-        {/* Input */}
-        <div className="border-t border-border bg-card">
-          <div className="container-custom py-4">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSend();
-              }}
-              className="flex items-center gap-3"
+      {/* ── Premium Input Dock ── */}
+      <div className="shrink-0 border-t border-border/25 bg-background/70 backdrop-blur-2xl">
+        {/* top shimmer line */}
+        <div className="pointer-events-none h-px w-full bg-gradient-to-r from-transparent via-foreground/10 to-transparent" />
+        <div className="container-custom py-4">
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+            className={`flex items-center gap-2 rounded-2xl border transition-all duration-300 ${
+              isFocused
+                ? 'border-foreground/25 bg-card/70 shadow-lg shadow-foreground/[0.04]'
+                : 'border-border/35 bg-card/40'
+            } px-2 py-2 backdrop-blur-sm`}
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder="What are you dressing for tonight?"
+              className="flex-1 bg-transparent px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+              disabled={isLoading}
+            />
+            <motion.button
+              type="submit"
+              disabled={!input.trim() || isLoading}
+              whileTap={{ scale: 0.94 }}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-foreground text-background transition-opacity duration-200 disabled:opacity-25"
             >
-              <button
-                type="button"
-                className="p-3 hover:bg-muted rounded-full transition-colors"
-                aria-label="Upload image"
-              >
-                <Image size={20} className="text-muted-foreground" />
-              </button>
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about fashion..."
-                className="flex-1 input-premium"
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                className="p-3 hover:bg-muted rounded-full transition-colors"
-                aria-label="Voice input"
-              >
-                <Mic size={20} className="text-muted-foreground" />
-              </button>
-              <button
-                type="submit"
-                disabled={!input.trim() || isLoading}
-                className="p-3 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isLoading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
-              </button>
-            </form>
-          </div>
+              {isLoading
+                ? <Loader2 size={15} className="animate-spin" />
+                : <ArrowUp size={15} strokeWidth={2} />
+              }
+            </motion.button>
+          </form>
+
+          <p className="mt-2.5 text-center text-[10px] tracking-[0.16em] text-muted-foreground/30">
+            SWITCH INTELLIGENCE — PERSONAL STYLE ENGINE
+          </p>
         </div>
       </div>
+    </div>
   );
 };
 

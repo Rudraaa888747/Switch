@@ -11,10 +11,5 @@ export const getAdminApiHeaders = async () => {
     headers.Authorization = `Bearer ${session.access_token}`;
   }
 
-  const legacyToken = import.meta.env.VITE_ADMIN_API_TOKEN;
-  if (legacyToken) {
-    headers['x-admin-token'] = legacyToken;
-  }
-
   return headers;
 };

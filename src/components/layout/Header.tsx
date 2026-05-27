@@ -11,7 +11,7 @@ import { getProductImage } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { createPortal } from 'react-dom';
 
-const premiumEase: Easing = [0.22, 1, 0.36, 1];
+const premiumEase: Easing = [0.83, 0, 0.17, 1];
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -36,9 +36,13 @@ const Header = () => {
   }, []);
 
   useEffect(() => {
+    // Immediately close menu and force-clear the body lock on route change.
+    // This MUST happen before AnimatePresence exit animation runs to prevent
+    // body[data-mobile-menu='open'] CSS lock persisting into the new page.
     setIsMenuOpen(false);
     setIsSearchOpen(false);
     setQuery('');
+    document.body.dataset.mobileMenu = 'closed';
   }, [location.pathname, setQuery]);
 
   useEffect(() => {
@@ -56,6 +60,7 @@ const Header = () => {
     }
 
     return () => {
+      // Hard cleanup: always reset body state when this effect re-runs or unmounts
       document.body.dataset.mobileMenu = 'closed';
     };
   }, [isMenuOpen]);
@@ -122,7 +127,16 @@ const Header = () => {
               {!isMobile && <div className="w-6" aria-hidden="true" />}
             </div>
 
-            <Link to="/" className="absolute left-1/2 max-w-[52vw] -translate-x-1/2 md:static md:max-w-none md:translate-x-0 md:flex-1 md:flex md:justify-center">
+            <Link 
+              to="/" 
+              onClick={(e) => {
+                if (location.pathname === '/') {
+                  e.preventDefault();
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+              className="absolute left-1/2 max-w-[52vw] -translate-x-1/2 md:static md:max-w-none md:translate-x-0 md:flex-1 md:flex md:justify-center"
+            >
               <motion.span
                 className={`block truncate text-center text-[0.92rem] font-light uppercase tracking-[0.28em] sm:text-[1rem] md:text-3xl md:tracking-[0.34em] ${isHome && !scrolled ? 'text-white' : 'text-foreground'}`}
                 whileHover={{ opacity: 0.7 }}
@@ -161,9 +175,7 @@ const Header = () => {
               {isMobile && (
                 <motion.button
                   onClick={() => setIsSearchOpen((value) => !value)}
-                  className={`touch-target rounded-full border ${
-                    isHome && !scrolled ? 'border-white/15 bg-black/18 text-white' : 'border-border/60 bg-background/72 text-foreground'
-                  }`}
+                  className="touch-target rounded-full"
                   aria-label="Search"
                   whileTap={{ scale: 0.92 }}
                 >
@@ -179,7 +191,14 @@ const Header = () => {
                 whileTap={{ scale: 0.92 }}
                 initial={{ opacity: 0.9 }}
               >
-                <ShoppingBag size={18} />
+                <motion.div
+                  key={cartItems}
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                >
+                  <ShoppingBag size={18} />
+                </motion.div>
                 {cartItems > 0 && (
                   <motion.span
                     className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background"
@@ -208,15 +227,27 @@ const Header = () => {
           </div>
 
           <nav className="hidden items-center justify-center gap-10 pb-4 md:flex">
-            {navLinks.map((link, index) => (
-              <motion.div key={link.name} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + index * 0.05, duration: 0.4, ease: premiumEase }}>
-                <Link to={link.path} className={`nav-link ${isActive(link.path) ? 'nav-link-active' : ''}`}>
-                  {link.name}
-                </Link>
-              </motion.div>
-            ))}
+            {navLinks.map((link, index) => {
+              const active = isActive(link.path);
+              return (
+                <motion.div key={link.name} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + index * 0.05, duration: 0.6, ease: premiumEase }}>
+                  <Link to={link.path} className="group relative py-2">
+                    <span className={`text-[11px] font-medium uppercase tracking-[0.2em] transition-colors duration-300 ${active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                      {link.name}
+                    </span>
+                    {active ? (
+                       <motion.div layoutId="navUnderline" className="absolute -bottom-1 left-0 right-0 h-[1px] bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.4)]" transition={{ ease: premiumEase, duration: 0.6 }} />
+                    ) : (
+                       <div className="absolute -bottom-1 left-0 right-0 h-[1px] origin-left scale-x-0 bg-foreground/40 transition-transform duration-500 ease-[cubic-bezier(0.83,0,0.17,1)] group-hover:scale-x-100" />
+                    )}
+                  </Link>
+                </motion.div>
+              );
+            })}
           </nav>
         </div>
+
+      </div>
 
         <AnimatePresence>
           {isSearchOpen && (
@@ -307,76 +338,116 @@ const Header = () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
 
       {typeof document !== 'undefined' &&
         createPortal(
-          <AnimatePresence>
-            {isMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: premiumEase }}
-            className="fixed inset-0 z-[60] md:hidden"
-          >
-            <div className="absolute inset-0 bg-black/52 backdrop-blur-xl" onClick={() => setIsMenuOpen(false)} />
-            <motion.div
-              initial={{ opacity: 0, y: -24 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -24 }}
-              transition={{ duration: 0.35, ease: premiumEase }}
-              className="mobile-blur-shell relative flex h-[100dvh] flex-col overflow-hidden overscroll-contain"
-            >
-              <div className="safe-top flex items-center justify-between border-b border-border/40 px-4 py-3.5">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Navigate</p>
-                  <p className="mt-1 text-base font-medium tracking-[0.08em]">SWITCH</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setIsMenuOpen(false)} className="touch-target flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background/70" aria-label="Close menu">
-                    <X size={16} />
-                  </button>
-                </div>
-              </div>
+          <>
 
-              <nav ref={mobileMenuScrollRef} className="custom-scrollbar flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
-                {[...navLinks, ...secondaryLinks].map((link, index) => (
-                  <motion.div key={link.name} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.035, duration: 0.25, ease: premiumEase }}>
-                    <Link
-                      to={link.path}
-                      onClick={() => setIsMenuOpen(false)}
-                      className={`theme-surface flex items-center justify-between rounded-[1.35rem] px-4 py-4 text-sm uppercase tracking-[0.2em] transition-all duration-300 ${
-                        isActive(link.path) ? 'border-foreground/60 bg-foreground text-background shadow-[0_28px_60px_-42px_hsl(var(--foreground)/0.85)]' : 'text-foreground/86 hover:border-foreground/20 hover:bg-muted/45 hover:text-foreground'
-                      }`}
-                    >
-                      <span>{link.name}</span>
-                      <ArrowRight size={14} className="opacity-25" />
-                    </Link>
-                  </motion.div>
-                ))}
-              </nav>
-
-              <div className="border-t border-border/40 px-3 pb-safe pt-3">
-                <div className="flex gap-2.5">
-                  <Link
-                    to={isAuthenticated ? '/profile' : '/auth'}
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-full border border-border/50 bg-background/78 px-4 py-3.5 text-xs uppercase tracking-[0.2em] transition-all hover:border-foreground/30"
+            <AnimatePresence>
+              {isMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25, ease: premiumEase }}
+                  className="fixed inset-0 z-[60] md:hidden"
+                >
+                  <div className="absolute inset-0 bg-black/52 backdrop-blur-xl" onClick={() => setIsMenuOpen(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.32, ease: premiumEase }}
+                    className="mobile-blur-shell relative flex h-[100dvh] flex-col overflow-hidden overscroll-contain"
                   >
-                    <User size={14} />
-                    Account
-                  </Link>
-                  <button onClick={openDrawer} className="btn-primary flex flex-1 items-center justify-center gap-2 px-4 py-3.5 text-xs">
-                    <ShoppingBag size={14} />
-                    Cart {cartItems > 0 ? `(${cartItems})` : ''}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-            )}
-          </AnimatePresence>,
+                    {/* Controlled ambient glow — single intentional source, not noisy blobs */}
+                    <div className="pointer-events-none absolute inset-0 -z-10">
+                      <div className="absolute left-1/2 top-[30%] h-[45vh] w-[55vw] -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/[0.04] blur-[80px]" />
+                    </div>
+
+                    <div className="safe-top flex items-center justify-between border-b border-border/30 px-4 py-3.5">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground/60">Navigate</p>
+                        <p className="mt-1 text-base font-medium tracking-[0.08em]">SWITCH</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* Lighter close button — less visual weight */}
+                        <button
+                          onClick={() => setIsMenuOpen(false)}
+                          className="touch-target flex h-9 w-9 items-center justify-center rounded-full border border-border/30 bg-background/50 transition-colors hover:border-border/60"
+                          aria-label="Close menu"
+                        >
+                          <X size={14} strokeWidth={1.5} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <nav ref={mobileMenuScrollRef} className="custom-scrollbar flex-1 flex flex-col justify-center overflow-y-auto overscroll-contain px-8 py-8">
+                      {[...navLinks, ...secondaryLinks].filter(l => l.name !== 'Wishlist').map((link, index) => {
+                        const active = isActive(link.path);
+                        return (
+                          <div key={link.name} className="py-1.5">
+                            <motion.div
+                              initial={{ y: 16, opacity: 0 }}
+                              animate={{ y: 0, opacity: 1 }}
+                              transition={{
+                                delay: index * 0.04,
+                                duration: 0.5,
+                                ease: premiumEase,
+                              }}
+                            >
+                              <Link
+                                to={link.path}
+                                onClick={() => setIsMenuOpen(false)}
+                                className="relative block py-2"
+                              >
+                                {active && (
+                                  <motion.div
+                                    layoutId="mobileNavGlow"
+                                    className="absolute left-0 top-1/2 -z-10 h-14 w-40 -translate-y-1/2 rounded-full bg-foreground/[0.07] blur-2xl"
+                                    transition={{ ease: premiumEase, duration: 0.7 }}
+                                  />
+                                )}
+                                <span
+                                  className={`block text-3xl sm:text-4xl font-light uppercase leading-normal transition-colors duration-400 ${
+                                    active
+                                      ? 'text-foreground tracking-[0.06em]'
+                                      : 'text-foreground/60 hover:text-foreground/85 tracking-[0.07em]'
+                                  }`}
+                                >
+                                  {link.name}
+                                </span>
+                              </Link>
+                            </motion.div>
+                          </div>
+                        );
+                      })}
+                    </nav>
+
+                    <div className="border-t border-border/30 px-3 pb-safe pt-3">
+                      <div className="flex gap-2.5">
+                        <Link
+                          to={isAuthenticated ? '/profile' : '/auth'}
+                          onClick={() => setIsMenuOpen(false)}
+                          className="flex flex-1 items-center justify-center gap-2 rounded-full border border-border/40 bg-background/60 px-4 py-3.5 text-xs uppercase tracking-[0.2em] transition-all hover:border-foreground/25 hover:bg-background/75"
+                        >
+                          <User size={14} strokeWidth={1.5} />
+                          Account
+                        </Link>
+                        <button
+                          onClick={openDrawer}
+                          className="btn-primary flex flex-1 items-center justify-center gap-2 px-4 py-3.5 text-xs"
+                        >
+                          <ShoppingBag size={14} strokeWidth={1.5} />
+                          Cart {cartItems > 0 ? `(${cartItems})` : ''}
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>,
           document.body,
         )}
     </motion.header>

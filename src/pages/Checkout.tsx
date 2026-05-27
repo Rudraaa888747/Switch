@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, MapPin, CreditCard, Check, Shield, Package, ArrowRight, CheckCircle2, Wallet, Truck } from 'lucide-react';
@@ -11,9 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import CouponInput from '@/components/checkout/CouponInput';
 import { getUserOrdersQueryKey } from '@/hooks/useOrders';
 import { useQueryClient } from '@tanstack/react-query';
-import { createAdminNotification } from '@/lib/adminNotifications';
 
-type Step = 'address' | 'payment' | 'confirmation';
+type Step = 'address' | 'transition' | 'payment' | 'confirmation';
 
 interface AddressForm {
   fullName: string;
@@ -127,7 +126,25 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { items, totalPrice, clearCart } = useCart();
   const { user, isAuthenticated, isAuthReady, supabaseUser, session, updateProfile } = useAuth();
-  const walletBalance = user?.walletBalance ?? 0;
+  const [liveWalletBalance, setLiveWalletBalance] = useState<number | null>(null);
+  const walletBalance = liveWalletBalance ?? user?.walletBalance ?? 0;
+
+  // Fetch LIVE wallet balance on mount — never trust the 15-min localStorage cache
+  useEffect(() => {
+    const uid = supabaseUser?.id;
+    if (!uid) return;
+    supabase
+      .from('profiles')
+      .select('wallet_balance')
+      .eq('user_id', uid)
+      .single()
+      .then(({ data }) => {
+        if (data != null && typeof data.wallet_balance === 'number') {
+          setLiveWalletBalance(data.wallet_balance);
+        }
+      })
+      .catch(() => { /* fall back to cached value */ });
+  }, [supabaseUser?.id]);
   const queryClient = useQueryClient();
   const addressFormRef = useRef<HTMLFormElement>(null);
   const paymentFormRef = useRef<HTMLFormElement>(null);
@@ -145,6 +162,63 @@ const Checkout = () => {
     state: '',
     pincode: '',
   });
+  const [errors, setErrors] = useState<Partial<Record<keyof AddressForm, string>>>({});
+  const [touched, setTouched] = useState<Partial<Record<keyof AddressForm, boolean>>>({});
+
+  const validateField = (field: keyof AddressForm, value: string) => {
+    let error = '';
+    switch (field) {
+      case 'fullName':
+        if (!value.trim()) error = 'Please enter your full name';
+        else if (value.trim().length < 3) error = 'Name must be at least 3 characters';
+        else if (/^[\d\s]+$/.test(value)) error = 'Name cannot be numbers only';
+        break;
+      case 'phone':
+        if (!value) error = 'Phone number must contain 10 digits';
+        else if (!/^\d{10}$/.test(value)) error = 'Phone number must contain 10 digits';
+        break;
+      case 'email':
+        if (value && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(value)) error = 'Please enter a valid email address';
+        break;
+      case 'address':
+        if (!value.trim()) error = 'Delivery address is required';
+        break;
+      case 'city':
+        if (!value.trim()) error = 'Please enter your city';
+        break;
+      case 'state':
+        if (!value.trim()) error = 'Please enter your state';
+        break;
+      case 'pincode':
+        if (!value) error = 'Please enter a valid 6-digit pincode';
+        else if (!/^\d{6}$/.test(value)) error = 'Please enter a valid 6-digit pincode';
+        break;
+    }
+    
+    setErrors(prev => ({ ...prev, [field]: error }));
+    return !error;
+  };
+
+  const validateAllAddressFields = () => {
+    const f1 = validateField('fullName', addressForm.fullName);
+    const f2 = validateField('phone', addressForm.phone);
+    const f3 = validateField('email', addressForm.email);
+    const f4 = validateField('address', addressForm.address);
+    const f5 = validateField('city', addressForm.city);
+    const f6 = validateField('state', addressForm.state);
+    const f7 = validateField('pincode', addressForm.pincode);
+    return f1 && f2 && f3 && f4 && f5 && f6 && f7;
+  };
+
+  const handleAddressChange = (field: keyof AddressForm, value: string) => {
+    setAddressForm(prev => ({ ...prev, [field]: value }));
+    if (touched[field]) validateField(field, value);
+  };
+
+  const handleAddressBlur = (field: keyof AddressForm) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    validateField(field, addressForm[field]);
+  };
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi' | 'cod'>('card');
   const [cardDetails, setCardDetails] = useState({ number: '', name: '', expiry: '', cvv: '' });
   const [upiId, setUpiId] = useState('');
@@ -160,25 +234,20 @@ const Checkout = () => {
     ]);
   };
 
-  const createOrderRecord = async (payload: Record<string, unknown>) => {
-    const { data, error } = await withTimeout(
-      supabase
-        .from('orders')
-        .insert(payload)
-        .select('id')
-        .single(),
-      'Order create request timed out',
-    );
 
-    if (error) {
-      throw error;
-    }
-
-    return data?.id as string;
-  };
 
   const shipping = 0;
-  const tax = Math.round((totalPrice - couponDiscount) * 0.18);
+  
+  const estimatedTax = items.reduce((acc, item) => {
+    const rate = item.product.price <= 1000 ? 0.05 : 0.12;
+    return acc + (item.product.price * item.quantity * rate);
+  }, 0);
+  
+  const finalTax = couponDiscount > 0 && totalPrice > 0 
+    ? estimatedTax * ((totalPrice - couponDiscount) / totalPrice) 
+    : estimatedTax;
+
+  const tax = Math.round(finalTax * 100) / 100;
   const grandTotal = totalPrice - couponDiscount + shipping + tax;
   const maxWalletPossible = Math.min(walletBalance, Math.max(grandTotal, 0));
   const walletApplied = useWallet ? maxWalletPossible : 0;
@@ -194,7 +263,8 @@ const Checkout = () => {
     [],
   );
 
-  const activeStepIndex = steps.findIndex((step) => step.id === currentStep);
+  const displayStepForTimeline = currentStep === 'transition' ? 'payment' : currentStep;
+  const activeStepIndex = steps.findIndex((step) => step.id === displayStepForTimeline);
 
   const handleCouponApply = (discount: number, couponData: CouponData | null) => {
     setCouponDiscount(discount);
@@ -203,16 +273,13 @@ const Checkout = () => {
 
   const handleAddressSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addressForm.fullName || !addressForm.phone || !addressForm.address || !addressForm.city || !addressForm.state || !addressForm.pincode) {
-      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+    setTouched({ fullName: true, phone: true, email: true, address: true, city: true, state: true, pincode: true });
+    
+    if (!validateAllAddressFields()) {
       return;
     }
 
-    if (addressForm.phone.length !== 10) {
-      toast({ title: 'Please enter a valid 10-digit phone number', variant: 'destructive' });
-      return;
-    }
-
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setCurrentStep('payment');
   };
 
@@ -242,34 +309,14 @@ const Checkout = () => {
     setIsProcessing(true);
 
     try {
-      const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const timestamp = Date.now().toString().slice(-6);
-      const newOrderId = `ORD-${timestamp}-${randomStr}`;
-      const estimatedDelivery = new Date();
-      estimatedDelivery.setDate(estimatedDelivery.getDate() + 7);
-      const dateOnly = estimatedDelivery.toISOString().split('T')[0];
-      const finalPaymentMethod = remainingTotal === 0 ? 'wallet' : `${walletApplied > 0 ? 'wallet+' : ''}${paymentMethod}`;
-
       const itemsPayload = items.map((item: CheckoutCartItem) => ({
         product_id: item.product.id,
-        product_name: item.product.name,
-        product_image: getProductImage(item.product, item.color),
         quantity: item.quantity,
-        price: item.product.price,
-        total_price: item.product.price * item.quantity,
         size: item.size,
         color: item.color,
       }));
 
       const rpcArgs: Record<string, unknown> = {
-        p_order_id: newOrderId,
-        p_user_id: currentUserId,
-        p_status: 'processing',
-        p_estimated_delivery: dateOnly,
-        p_subtotal: totalPrice - couponDiscount,
-        p_tax: tax,
-        p_shipping: shipping,
-        p_total: grandTotal,
         p_items: itemsPayload,
         p_customer_name: addressForm.fullName,
         p_customer_email: addressForm.email || null,
@@ -278,61 +325,41 @@ const Checkout = () => {
         p_shipping_city: addressForm.city,
         p_shipping_state: addressForm.state,
         p_shipping_pincode: addressForm.pincode,
-        p_payment_method: finalPaymentMethod,
+        p_payment_method: paymentMethod,
+        p_use_wallet: useWallet,
       };
 
-      if (walletApplied !== undefined) {
-        rpcArgs.p_wallet_amount = walletApplied;
-      }
       if (appliedCoupon?.code) {
         rpcArgs.p_coupon_code = appliedCoupon.code;
       }
 
-      let rpcResult, rpcError;
       const res = await withTimeout(
-        supabase.rpc('place_order_v2', rpcArgs),
+        supabase.rpc('place_order_secure', rpcArgs),
         'Order placement timed out',
       );
 
-      if (res.error && res.error.message.includes('Could not find the function')) {
-        // Fallback for older schema caches
-        delete rpcArgs.p_coupon_code;
-        delete rpcArgs.p_wallet_amount;
-        const fallbackRes = await withTimeout(
-          supabase.rpc('place_order_v2', rpcArgs),
-          'Order placement timed out',
-        );
-        rpcResult = fallbackRes.data;
-        rpcError = fallbackRes.error;
-      } else {
-        rpcResult = res.data;
-        rpcError = res.error;
-      }
+      if (res.error) throw res.error;
 
-      if (rpcError) throw rpcError;
-
+      const rpcResult = res.data;
       const parsed = typeof rpcResult === 'string' ? JSON.parse(rpcResult) : rpcResult;
+      
       if (!parsed?.success) {
         throw new Error(parsed?.error || 'Failed to place order via server');
       }
 
-      createAdminNotification({
-        title: 'New order received',
-        message: `${addressForm.fullName} placed ${newOrderId} for ${formatPrice(grandTotal)}.`,
-        type: 'info',
-        eventType: 'new_order',
-        link: '/admin/orders',
-        metadata: { orderId: newOrderId, total: grandTotal, paymentMethod: finalPaymentMethod },
-      }).catch(() => {});
+      const finalOrderId = parsed.order_id;
+      const finalGrandTotal = parsed.grand_total;
 
-      if (walletApplied > 0 && currentUserId) {
-        updateProfile({ walletBalance: Math.max(0, walletBalance - walletApplied) });
+      // Admin notification is now created server-side by place_order_secure RPC
+      // (prevents client-side spam / abuse)
+
+      if (useWallet && currentUserId) {
         queryClient.invalidateQueries({ queryKey: ['wallet-profile-balance', currentUserId] });
         queryClient.invalidateQueries({ queryKey: ['wallet-transactions', currentUserId] });
       }
 
-      setOrderId(newOrderId);
-      setConfirmedOrder({ id: newOrderId, total: grandTotal, discount: couponDiscount, couponCode: appliedCoupon?.code });
+      setOrderId(finalOrderId);
+      setConfirmedOrder({ id: finalOrderId, total: finalGrandTotal, discount: couponDiscount, couponCode: appliedCoupon?.code });
       queryClient.invalidateQueries({ queryKey: getUserOrdersQueryKey(currentUserId) });
       clearCart();
       setCurrentStep('confirmation');
@@ -375,33 +402,58 @@ const Checkout = () => {
 
   return (
     <>
-      <div className="container-custom py-6 pb-[calc(var(--mobile-content-bottom)+6rem)] md:py-8 md:pb-8">
+      <div className="container-custom py-6 pb-[calc(var(--mobile-content-bottom)+6rem)] md:pt-[120px] md:pb-12">
         {currentStep !== 'confirmation' && (
-          <button onClick={() => (currentStep === 'address' ? navigate('/cart') : setCurrentStep('address'))} className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-            <ChevronLeft size={18} />
-            {currentStep === 'address' ? 'Back to Cart' : 'Back to Address'}
+          <button onClick={() => (currentStep === 'address' ? navigate('/cart') : setCurrentStep('address'))} className="group mb-6 flex w-fit items-center gap-2 text-sm text-muted-foreground transition-all hover:text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-border/40 transition-transform duration-300 group-hover:-translate-x-1 group-hover:bg-border/80">
+              <ChevronLeft size={16} />
+            </div>
+            <span className="font-medium tracking-wide uppercase text-[11px]">{currentStep === 'address' ? 'Back to Cart' : 'Back to Address'}</span>
           </button>
         )}
 
         {currentStep !== 'confirmation' && (
-          <div className="mb-8 flex items-center justify-between gap-2 overflow-x-auto">
-            {steps.map((step, index) => {
-              const Icon = step.icon;
-              const isActive = step.id === currentStep;
-              const isPast = activeStepIndex > index;
-              return (
-                <div key={step.id} className="flex min-w-0 flex-1 items-center">
-                  <div className={`flex flex-1 items-center gap-2 rounded-full px-3 py-2.5 text-xs uppercase tracking-[0.18em] ${
-                    isActive ? 'bg-foreground text-background' : isPast ? 'bg-foreground/10 text-foreground' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    <Icon size={15} />
-                    <span className="hidden sm:block">{step.label}</span>
+          <>
+            {/* Desktop UI: Original layout */}
+            <div className="mb-8 hidden md:flex items-center justify-between gap-2 overflow-x-auto">
+              {steps.map((step, index) => {
+                const Icon = step.icon;
+                const isActive = step.id === displayStepForTimeline;
+                const isPast = activeStepIndex > index;
+                return (
+                  <div key={step.id} className="flex min-w-0 flex-1 items-center">
+                    <div className={`flex flex-1 items-center gap-2 rounded-full px-3 py-2.5 text-xs uppercase tracking-[0.18em] ${
+                      isActive ? 'bg-foreground text-background' : isPast ? 'bg-foreground/10 text-foreground' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      <Icon size={15} />
+                      <span>{step.label}</span>
+                    </div>
+                    {index < steps.length - 1 && <div className={`mx-2 h-px w-4 md:w-10 ${isPast ? 'bg-foreground' : 'bg-border'}`} />}
                   </div>
-                  {index < steps.length - 1 && <div className={`mx-2 h-px w-4 md:w-10 ${isPast ? 'bg-foreground' : 'bg-border'}`} />}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+
+            {/* Mobile UI: Flattened flex layout to fix mismatch */}
+            <div className="mb-8 flex md:hidden w-full items-center justify-between gap-1.5">
+              {steps.map((step, index) => {
+                const Icon = step.icon;
+                const isActive = step.id === displayStepForTimeline;
+                const isPast = activeStepIndex > index;
+                return (
+                  <React.Fragment key={step.id}>
+                    <div className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-2 text-[9.5px] uppercase tracking-[0.1em] whitespace-nowrap transition-colors ${
+                      isActive ? 'bg-foreground text-background' : isPast ? 'bg-foreground/10 text-foreground' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      <Icon size={14} className="shrink-0" />
+                      <span className="truncate">{step.label}</span>
+                    </div>
+                    {index < steps.length - 1 && <div className={`h-px w-2 shrink-0 ${isPast ? 'bg-foreground' : 'bg-border'}`} />}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </>
         )}
 
         <AnimatePresence mode="wait">
@@ -411,40 +463,96 @@ const Checkout = () => {
                 <div className="rounded-[1.8rem] border border-border/70 bg-card/80 p-5 shadow-[0_20px_50px_-40px_rgba(0,0,0,0.45)] md:p-8">
                   <h2 className="mb-6 text-xl font-semibold">Delivery Address</h2>
 
-                  <form ref={addressFormRef} onSubmit={handleAddressSubmit} className="space-y-5">
-                    <div className="grid gap-5 md:grid-cols-2">
-                      <div>
+                  <form ref={addressFormRef} onSubmit={handleAddressSubmit} className="space-y-6">
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="relative">
                         <label className="mb-2 block text-sm font-medium">Full Name *</label>
-                        <input type="text" value={addressForm.fullName} onChange={(e) => setAddressForm({ ...addressForm, fullName: e.target.value })} className="input-premium" placeholder="Enter your full name" />
+                        <input type="text" value={addressForm.fullName} onChange={(e) => handleAddressChange('fullName', e.target.value)} onBlur={() => handleAddressBlur('fullName')} className={`input-premium transition-all duration-300 w-full ${errors.fullName ? 'border-rose-900/60 bg-rose-950/20 shadow-[inset_0_0_20px_rgba(244,63,94,0.03)] focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 focus:shadow-[0_0_15px_rgba(244,63,94,0.1)]' : ''}`} placeholder="Enter your full name" />
+                        <AnimatePresence>
+                          {errors.fullName && (
+                            <motion.div initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2 }} transition={{ duration: 0.2 }} className="absolute -bottom-[18px] left-1 flex items-center gap-1.5">
+                              <span className="h-1 w-1 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+                              <p className="text-[10px] tracking-wide text-rose-400/90">{errors.fullName}</p>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                      <div>
+                      <div className="relative">
                         <label className="mb-2 block text-sm font-medium">Phone Number *</label>
-                        <input type="tel" value={addressForm.phone} onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} className="input-premium" placeholder="10-digit mobile number" />
+                        <input type="tel" value={addressForm.phone} onChange={(e) => handleAddressChange('phone', e.target.value.replace(/\D/g, '').slice(0, 10))} onBlur={() => handleAddressBlur('phone')} className={`input-premium transition-all duration-300 w-full ${errors.phone ? 'border-rose-900/60 bg-rose-950/20 shadow-[inset_0_0_20px_rgba(244,63,94,0.03)] focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 focus:shadow-[0_0_15px_rgba(244,63,94,0.1)]' : ''}`} placeholder="10-digit mobile number" />
+                        <AnimatePresence>
+                          {errors.phone && (
+                            <motion.div initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2 }} transition={{ duration: 0.2 }} className="absolute -bottom-[18px] left-1 flex items-center gap-1.5">
+                              <span className="h-1 w-1 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+                              <p className="text-[10px] tracking-wide text-rose-400/90">{errors.phone}</p>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     </div>
 
-                    <div>
+                    <div className="relative">
                       <label className="mb-2 block text-sm font-medium">Email Address</label>
-                      <input type="email" value={addressForm.email} onChange={(e) => setAddressForm({ ...addressForm, email: e.target.value })} className="input-premium" placeholder="Enter your email (optional)" />
+                      <input type="email" value={addressForm.email} onChange={(e) => handleAddressChange('email', e.target.value)} onBlur={() => handleAddressBlur('email')} className={`input-premium transition-all duration-300 w-full ${errors.email ? 'border-rose-900/60 bg-rose-950/20 shadow-[inset_0_0_20px_rgba(244,63,94,0.03)] focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 focus:shadow-[0_0_15px_rgba(244,63,94,0.1)]' : ''}`} placeholder="Enter your email (optional)" />
+                      <AnimatePresence>
+                        {errors.email && (
+                          <motion.div initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2 }} transition={{ duration: 0.2 }} className="absolute -bottom-[18px] left-1 flex items-center gap-1.5">
+                            <span className="h-1 w-1 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+                            <p className="text-[10px] tracking-wide text-rose-400/90">{errors.email}</p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
-                    <div>
+                    <div className="relative">
                       <label className="mb-2 block text-sm font-medium">Address *</label>
-                      <textarea value={addressForm.address} onChange={(e) => setAddressForm({ ...addressForm, address: e.target.value })} className="input-premium min-h-[110px] resize-none" placeholder="House no, Building, Street, Area" />
+                      <textarea value={addressForm.address} onChange={(e) => handleAddressChange('address', e.target.value)} onBlur={() => handleAddressBlur('address')} className={`input-premium min-h-[110px] resize-none transition-all duration-300 w-full ${errors.address ? 'border-rose-900/60 bg-rose-950/20 shadow-[inset_0_0_20px_rgba(244,63,94,0.03)] focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 focus:shadow-[0_0_15px_rgba(244,63,94,0.1)]' : ''}`} placeholder="House no, Building, Street, Area" />
+                      <AnimatePresence>
+                        {errors.address && (
+                          <motion.div initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2 }} transition={{ duration: 0.2 }} className="absolute -bottom-[18px] left-1 flex items-center gap-1.5">
+                            <span className="h-1 w-1 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+                            <p className="text-[10px] tracking-wide text-rose-400/90">{errors.address}</p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
-                    <div className="grid gap-5 md:grid-cols-3">
-                      <div>
+                    <div className="grid gap-6 md:grid-cols-3">
+                      <div className="relative">
                         <label className="mb-2 block text-sm font-medium">City *</label>
-                        <input type="text" value={addressForm.city} onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })} className="input-premium" placeholder="City" />
+                        <input type="text" value={addressForm.city} onChange={(e) => handleAddressChange('city', e.target.value)} onBlur={() => handleAddressBlur('city')} className={`input-premium transition-all duration-300 w-full ${errors.city ? 'border-rose-900/60 bg-rose-950/20 shadow-[inset_0_0_20px_rgba(244,63,94,0.03)] focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 focus:shadow-[0_0_15px_rgba(244,63,94,0.1)]' : ''}`} placeholder="City" />
+                        <AnimatePresence>
+                          {errors.city && (
+                            <motion.div initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2 }} transition={{ duration: 0.2 }} className="absolute -bottom-[18px] left-1 flex items-center gap-1.5">
+                              <span className="h-1 w-1 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+                              <p className="text-[10px] tracking-wide text-rose-400/90">{errors.city}</p>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                      <div>
+                      <div className="relative">
                         <label className="mb-2 block text-sm font-medium">State *</label>
-                        <input type="text" value={addressForm.state} onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })} className="input-premium" placeholder="State" />
+                        <input type="text" value={addressForm.state} onChange={(e) => handleAddressChange('state', e.target.value)} onBlur={() => handleAddressBlur('state')} className={`input-premium transition-all duration-300 w-full ${errors.state ? 'border-rose-900/60 bg-rose-950/20 shadow-[inset_0_0_20px_rgba(244,63,94,0.03)] focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 focus:shadow-[0_0_15px_rgba(244,63,94,0.1)]' : ''}`} placeholder="State" />
+                        <AnimatePresence>
+                          {errors.state && (
+                            <motion.div initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2 }} transition={{ duration: 0.2 }} className="absolute -bottom-[18px] left-1 flex items-center gap-1.5">
+                              <span className="h-1 w-1 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+                              <p className="text-[10px] tracking-wide text-rose-400/90">{errors.state}</p>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                      <div>
+                      <div className="relative">
                         <label className="mb-2 block text-sm font-medium">Pincode *</label>
-                        <input type="text" value={addressForm.pincode} onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} className="input-premium" placeholder="6-digit pincode" />
+                        <input type="text" value={addressForm.pincode} onChange={(e) => handleAddressChange('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))} onBlur={() => handleAddressBlur('pincode')} className={`input-premium transition-all duration-300 w-full ${errors.pincode ? 'border-rose-900/60 bg-rose-950/20 shadow-[inset_0_0_20px_rgba(244,63,94,0.03)] focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 focus:shadow-[0_0_15px_rgba(244,63,94,0.1)]' : ''}`} placeholder="6-digit pincode" />
+                        <AnimatePresence>
+                          {errors.pincode && (
+                            <motion.div initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2 }} transition={{ duration: 0.2 }} className="absolute -bottom-[18px] left-1 flex items-center gap-1.5">
+                              <span className="h-1 w-1 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+                              <p className="text-[10px] tracking-wide text-rose-400/90">{errors.pincode}</p>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     </div>
 
@@ -471,38 +579,59 @@ const Checkout = () => {
             </motion.div>
           )}
 
+          {currentStep === 'transition' && (
+            <motion.div key="transition" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.4 }} className="grid gap-6 lg:grid-cols-3 lg:gap-8">
+              <div className="lg:col-span-2">
+                <div className="rounded-[1.8rem] border border-border/70 bg-card/60 p-5 md:p-8">
+                  <div className="mb-8 flex items-center gap-3">
+                    <div className="h-10 w-10 animate-pulse rounded-full bg-muted/60" />
+                    <div className="h-6 w-40 animate-pulse rounded-md bg-muted/60" />
+                  </div>
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex h-20 items-center gap-4 rounded-[1.45rem] border border-border/40 bg-background/40 px-4">
+                        <div className="h-5 w-5 animate-pulse rounded-full bg-muted/60" />
+                        <div className="h-4 w-32 animate-pulse rounded-md bg-muted/60" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-8 h-12 w-full animate-pulse rounded-full bg-muted/60 md:hidden" />
+                </div>
+              </div>
+              <div className="lg:col-span-1 hidden lg:block">
+                <div className="h-[400px] w-full animate-pulse rounded-[1.8rem] border border-border/50 bg-card/60" />
+              </div>
+            </motion.div>
+          )}
+
           {currentStep === 'payment' && (
             <motion.div key="payment" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="grid gap-6 lg:grid-cols-3 lg:gap-8">
               <div className="lg:col-span-2">
                 <div className="rounded-[1.8rem] border border-border/70 bg-card/80 p-5 shadow-[0_20px_50px_-40px_rgba(0,0,0,0.45)] md:p-8">
-                  <h2 className="mb-6 text-xl font-semibold">Payment Method</h2>
-
-                  {canUseWallet && (
-                    <div onClick={() => setUseWallet(!useWallet)} className={`mb-6 cursor-pointer rounded-[1.5rem] border p-5 transition-all ${useWallet ? 'border-foreground bg-foreground/[0.04]' : 'border-border bg-secondary/20 hover:border-foreground/30'}`}>
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`rounded-full p-3 ${useWallet ? 'bg-foreground/12' : 'bg-secondary'}`}>
-                            <Wallet className="h-5 w-5 text-foreground" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Wallet Balance Available</p>
-                            <p className="mt-1 text-lg font-bold">{formatPrice(maxWalletPossible)}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${useWallet ? 'border-foreground bg-foreground text-background' : 'border-muted-foreground/30'}`}>
-                            {useWallet && <Check size={12} />}
-                          </div>
-                          <span className="text-sm font-medium">{useWallet ? 'Applied' : 'Use Wallet'}</span>
-                        </div>
-                      </div>
-                      <p className="mt-3 border-t border-border/50 pt-3 text-sm text-muted-foreground">
-                        {useWallet ? `${formatPrice(maxWalletPossible)} will be applied before your selected payment method.` : 'Tap to apply your wallet balance to this order.'}
-                      </p>
+                  <div className="mb-6 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-foreground/[0.04] text-foreground">
+                      <Wallet size={18} className="opacity-80" />
                     </div>
-                  )}
+                    <h2 className="text-xl font-semibold tracking-tight">Payment Method</h2>
+                  </div>
 
                   <div className="mb-6 space-y-3">
+                    <div className={`overflow-hidden rounded-[1.45rem] border transition-all ${useWallet ? 'border-foreground bg-foreground/[0.04] shadow-[0_20px_45px_-36px_rgba(0,0,0,0.55)]' : 'border-border bg-card'}`}>
+                      <label className={`flex cursor-pointer items-center gap-4 px-4 py-4 ${!canUseWallet && 'opacity-60 cursor-not-allowed'}`}>
+                        <input type="checkbox" checked={useWallet} onChange={(e) => { if (!canUseWallet) e.preventDefault(); else setUseWallet(!useWallet); }} disabled={!canUseWallet} className="h-4 w-4 text-primary accent-foreground" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium">SWITCH Wallet</p>
+                            <p className="text-sm font-semibold">{formatPrice(walletBalance)}</p>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {canUseWallet 
+                              ? (useWallet ? `Applied ${formatPrice(maxWalletPossible)} to this order` : 'Tap to apply balance') 
+                              : 'Insufficient balance'}
+                          </p>
+                        </div>
+                      </label>
+                    </div>
                     {paymentMethods.map((method) => {
                       const isSelected = paymentMethod === method.id;
                       return (
@@ -551,7 +680,7 @@ const Checkout = () => {
 
                                   {method.id === 'cod' && (
                                     <div className="rounded-[1rem] border border-border/60 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-                                      Pay when your order reaches you. A premium confirmation flow still applies.
+                                      Pay when your order reaches you.
                                     </div>
                                   )}
                                 </div>
@@ -636,7 +765,7 @@ const Checkout = () => {
         </AnimatePresence>
       </div>
 
-      {currentStep !== 'confirmation' && (
+    {currentStep !== 'confirmation' && currentStep !== 'transition' && (
         <div className="sticky-mobile-bottom px-3 md:hidden">
           <div className="mobile-glass-panel rounded-[1.8rem] px-4 py-3 safe-bottom">
             <div className="mb-3 flex items-center justify-between">

@@ -29,7 +29,7 @@ export const useUserOrders = (userId?: string | null, accessToken?: string | nul
     gcTime: 15 * 60_000,
     retry: 1,
     refetchOnWindowFocus: false,
-    refetchInterval: 15_000,
+    // No refetchInterval — realtime subscription handles live updates
   });
 
   useEffect(() => {

@@ -10,6 +10,11 @@ const Cart = () => {
   const { items, updateQuantity, removeFromCart, totalPrice, totalItems } = useCart();
   const { isAuthenticated, isAuthReady } = useAuth();
 
+  const estimatedTax = Math.round(items.reduce((acc, item) => {
+    const rate = item.product.price <= 2500 ? 0.05 : 0.18;
+    return acc + (item.product.price * item.quantity * rate);
+  }, 0));
+
   if (isAuthReady && !isAuthenticated) {
     return <Navigate to="/auth" replace />;
   }
@@ -86,13 +91,13 @@ const Cart = () => {
               <div className="mt-5 space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatPrice(totalPrice)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Shipping</span><span className="text-emerald-600">Included</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Estimated tax</span><span>{formatPrice(Math.round(totalPrice * 0.18))}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Estimated tax</span><span>{formatPrice(estimatedTax)}</span></div>
                 <div className="border-t border-border pt-3">
                   <div className="flex justify-between text-lg font-semibold">
                     <span>Total</span>
-                    <span>{formatPrice(totalPrice)}</span>
+                    <span>{formatPrice(totalPrice + estimatedTax)}</span>
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">A calmer, faster mobile checkout with touch-safe sticky payment controls.</p>
+
                 </div>
               </div>
               <Link to="/checkout" className="btn-primary mt-6 flex w-full items-center justify-center gap-2">
@@ -109,9 +114,9 @@ const Cart = () => {
           <div className="mb-3 flex items-center justify-between">
             <div>
               <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">Total</p>
-              <p className="mt-1 text-lg font-semibold">{formatPrice(totalPrice)}</p>
+              <p className="mt-1 text-lg font-semibold">{formatPrice(totalPrice + estimatedTax)}</p>
             </div>
-            <p className="max-w-[8.5rem] text-right text-[11px] leading-5 text-muted-foreground">Fast, one-hand checkout designed for thumb reach.</p>
+
           </div>
           <Link to="/checkout" className="btn-primary flex w-full items-center justify-center gap-2 px-4 py-3 text-[10px]">
             Checkout

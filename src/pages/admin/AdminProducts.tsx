@@ -1,3 +1,4 @@
+// AdminProducts — optimized build
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -184,6 +185,7 @@ const AdminProducts = () => {
   const [queryErrorMessage, setQueryErrorMessage] = useState<string | null>(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState<'general' | 'inventory' | 'variants' | 'seo'>('general');
 
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
@@ -211,8 +213,9 @@ const AdminProducts = () => {
   const { data: dbProducts = [], isLoading } = useQuery({
     queryKey: ['admin-products'],
     queryFn: async () => {
+      // Only fetch columns needed for the table — avoids loading massive variants JSON
       const params = new URLSearchParams({
-        select: '*',
+        select: 'id,name,price,original_price,category,stock_quantity,image_url,is_new,is_trending,brand,sizes,colors,variants',
         order: 'created_at.desc',
       });
       const data = await supabaseRestSelect<ProductData[]>('products', params);
@@ -222,6 +225,7 @@ const AdminProducts = () => {
     onError: (error: Error) => {
       setQueryErrorMessage(error.message || 'Failed to load products from Supabase.');
     },
+    staleTime: 30_000,  // Cache for 30s — avoid refetch on every focus
     retry: 1,
   });
 
@@ -251,7 +255,11 @@ const AdminProducts = () => {
 
   const addMutation = useMutation({
     mutationFn: async (newProduct: ProductFormValues) => {
-      const data = await supabaseRestInsert<ProductData[]>('products', [{ ...newProduct, id: `prod-${Date.now()}` }]);
+      // Explicitly omit 'id' at runtime — Postgres uses DEFAULT gen_random_uuid()
+      // Sending id:null or id:undefined overrides the DEFAULT and causes 23502 NOT NULL violation
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id: _stripId, ...safePayload } = newProduct as ProductFormValues & { id?: unknown };
+      const data = await supabaseRestInsert<ProductData[]>('products', [safePayload]);
       return data[0];
     },
     onSuccess: () => {
@@ -264,30 +272,38 @@ const AdminProducts = () => {
         eventType: 'product_added',
         link: '/admin/products',
       }).catch(() => {});
-      toast({ title: 'Product Added Successfully' });
+      toast({ title: '✓ Product Added Successfully' });
       setShowModal(false);
       resetForm();
     },
-    onError: (error: Error) => {
-      toast({ title: 'Error Adding Product', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      // Surface full Supabase error — code + message
+      const err = error as { message?: string; code?: string; details?: string };
+      const detail = [err.code, err.message, err.details].filter(Boolean).join(' — ');
+      toast({ title: 'Failed to Add Product', description: detail || 'Unknown error', variant: 'destructive' });
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<ProductFormValues> }) => {
+      // Strip id from the updates payload — we never want to send id in a PATCH body
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id: _stripId, ...safeUpdates } = updates as Partial<ProductFormValues> & { id?: unknown };
       const params = new URLSearchParams({ id: `eq.${id}` });
-      const data = await supabaseRestUpdate<ProductData[]>('products', updates, params);
+      const data = await supabaseRestUpdate<ProductData[]>('products', safeUpdates, params);
       return data[0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
       queryClient.invalidateQueries({ queryKey: ['admin-overview'] });
-      toast({ title: 'Product Updated Successfully' });
+      toast({ title: '✓ Product Updated Successfully' });
       setShowModal(false);
       resetForm();
     },
-    onError: (error: Error) => {
-      toast({ title: 'Error Updating Product', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      const err = error as { message?: string; code?: string; details?: string };
+      const detail = [err.code, err.message, err.details].filter(Boolean).join(' — ');
+      toast({ title: 'Failed to Update Product', description: detail || 'Unknown error', variant: 'destructive' });
     },
   });
 
@@ -333,6 +349,7 @@ const AdminProducts = () => {
     setIsEditing(false);
     setPreviewImageIndex(0);
     setSelectedVariantIndex(0);
+    setActiveTab('general');
     setQueryErrorMessage(null);
   };
 
@@ -371,17 +388,36 @@ const AdminProducts = () => {
     setShowModal(true);
     setPreviewImageIndex(0);
     setSelectedVariantIndex(0);
+    setActiveTab('general');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    // Manual validation — works regardless of which tab is active
+    if (!formData.name.trim()) {
+      toast({ title: 'Product name is required', variant: 'destructive' });
+      setActiveTab('general');
+      return;
+    }
+
+    const hasVariants = variants.length > 0;
+    if (!hasVariants && !formData.price) {
+      toast({ title: 'Price is required', variant: 'destructive' });
+      setActiveTab('inventory');
+      return;
+    }
+    if (hasVariants && variants.some(v => !v.price || parseFloat(v.price) <= 0)) {
+      toast({ title: 'All variants must have a price', variant: 'destructive' });
+      setActiveTab('variants');
+      return;
+    }
 
     // Auto-detect category if not explicitly set
     const autoCat = autoCategorizeProduct(formData.name, formData.description);
     const manualCategory = isCustomCategory && customCategory.trim() ? customCategory.trim().toLowerCase() : formData.category;
     const finalCategory = manualCategory || autoCat.category;
 
-    const hasVariants = variants.length > 0;
     const totalStock = hasVariants
       ? variants.reduce((sum, v) => sum + (v.stock || 0), 0)
       : parseInt(formData.stock) || 0;
@@ -458,27 +494,68 @@ const AdminProducts = () => {
 
   const handleVariantImageUpload = async (variantId: string, file: File) => {
     if (!file) return;
+
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const MAX_SIZE_MB = 5;
+    const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast({
+        title: 'Invalid file type',
+        description: `Only JPEG, PNG, WebP, and GIF images are allowed.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (file.size > MAX_SIZE_BYTES) {
+      toast({
+        title: 'File too large',
+        description: `Image must be under ${MAX_SIZE_MB}MB. This file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     toast({ title: 'Uploading image...' });
     try {
-      const sanitizedName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const { data, error } = await supabase.storage.from('products').upload(sanitizedName, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+      // Use flat root path — consistent with existing files in the bucket
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${Date.now()}-${sanitizedName}`;
+
+      const { data, error } = await supabase.storage
+        .from('products')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,          // avoids 409 conflicts on re-upload
+          contentType: file.type,
+        });
+
       if (error) {
-        console.error('[Upload Error]', error);
-        throw error;
+        // Surface the EXACT Supabase error — statusCode, message, error name
+        const detail = `${error.message}${(error as any).statusCode ? ` (HTTP ${(error as any).statusCode})` : ''}`;
+        console.error('[Supabase Upload Error]', error);
+        toast({
+          title: 'Upload failed',
+          description: detail,
+          variant: 'destructive',
+        });
+        return;
       }
-      const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(data.path, {
-        download: false,
-      });
-      setVariants(prev => prev.map(v =>
-        v.id === variantId ? { ...v, images: [...v.images, publicUrl] } : v
-      ));
-      toast({ title: 'Image uploaded' });
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('products')
+        .getPublicUrl(data.path);
+
+      setVariants(prev =>
+        prev.map(v =>
+          v.id === variantId ? { ...v, images: [...v.images, publicUrl] } : v
+        )
+      );
+      toast({ title: '✓ Image uploaded successfully' });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Upload failed';
-      console.error('[Upload Error]', message);
+      const message = err instanceof Error ? err.message : 'Unexpected upload error';
+      console.error('[Upload Exception]', err);
       toast({ title: 'Upload failed', description: message, variant: 'destructive' });
     }
   };
@@ -651,33 +728,28 @@ const AdminProducts = () => {
                         </td>
                       </tr>
                     ) : (
-                      filteredProducts.map((product, index) => (
-                        <motion.tr
+                      filteredProducts.map((product) => (
+                        <tr
                           key={product.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.05 * index, duration: 0.3 }}
-                          whileHover={{ backgroundColor: 'hsl(var(--muted) / 0.3)' }}
-                          className="transition-colors"
+                          className="transition-colors hover:bg-muted/30"
                         >
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-4">
-                              <motion.div
-                                whileHover={{ scale: 1.08 }}
-                                className="w-12 h-14 bg-muted rounded-lg overflow-hidden border border-border flex-shrink-0"
-                              >
+                              <div className="w-12 h-14 bg-muted rounded-lg overflow-hidden border border-border flex-shrink-0">
                                 {product.image_url ? (
                                   <img
-                                    src={normalizeImageUrl(product.image_url)}
+                                    src={product.image_url}
                                     alt={product.name}
                                     className="w-full h-full object-cover"
+                                    loading="lazy"
+                                    decoding="async"
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
                                     <ImageIcon size={20} />
                                   </div>
                                 )}
-                              </motion.div>
+                              </div>
                               <div className="min-w-0">
                                 <p className="font-medium text-sm text-foreground truncate">{product.name}</p>
                                 <div className="flex items-center gap-2 mt-0.5">
@@ -699,11 +771,7 @@ const AdminProducts = () => {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              <motion.div
-                                animate={{
-                                  scale: product.stock_quantity <= 10 ? [1, 1.3, 1] : 1,
-                                }}
-                                transition={{ repeat: product.stock_quantity <= 10 ? Infinity : 0, duration: 2 }}
+                              <div
                                 className={`w-2 h-2 rounded-full ${
                                   product.stock_quantity === 0 ? 'bg-rose-500' :
                                   product.stock_quantity <= 10 ? 'bg-amber-500' : 'bg-emerald-500'
@@ -719,25 +787,21 @@ const AdminProducts = () => {
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.95 }}
+                              <button
                                 onClick={() => handleEditClick(product)}
                                 className="p-2 hover:bg-indigo-500/10 rounded-lg text-muted-foreground hover:text-indigo-500 transition-colors"
                               >
                                 <Edit size={18} />
-                              </motion.button>
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.95 }}
+                              </button>
+                              <button
                                 onClick={() => { if (window.confirm('Delete this product permanently?')) deleteMutation.mutate(product.id); }}
                                 className="p-2 hover:bg-rose-500/10 rounded-lg text-muted-foreground hover:text-rose-500 transition-colors"
                               >
                                 <Trash2 size={18} />
-                              </motion.button>
+                              </button>
                             </div>
                           </td>
-                        </motion.tr>
+                        </tr>
                       ))
                     )}
                   </tbody>
@@ -792,6 +856,20 @@ const AdminProducts = () => {
 
                   <form id="product-form" onSubmit={handleSubmit} className="flex flex-col lg:flex-row gap-8">
                     <div className="flex-1 min-w-0 space-y-6">
+                      <div className="flex items-center gap-2 border-b border-border/50 pb-4 mb-4 overflow-x-auto custom-scrollbar">
+                        {['general', 'inventory', 'variants', 'seo'].map(tab => (
+                          <button
+                            key={tab}
+                            type="button"
+                            onClick={() => setActiveTab(tab as any)}
+                            className={`px-4 py-2 text-sm font-semibold capitalize rounded-lg transition-all ${activeTab === tab ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                          >
+                            {tab}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className={activeTab === 'general' ? 'space-y-6' : 'hidden'}>
                       <motion.div
                         initial={{ opacity: 0, x: -12 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -833,7 +911,9 @@ const AdminProducts = () => {
                           />
                         </div>
                       </motion.div>
+                      </div>
 
+                      <div className={activeTab === 'inventory' ? 'space-y-6' : 'hidden'}>
                       <motion.div
                         initial={{ opacity: 0, x: -12 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -879,7 +959,9 @@ const AdminProducts = () => {
                           )}
                         </div>
                       </motion.div>
+                      </div>
 
+                      <div className={activeTab === 'general' ? 'space-y-6' : 'hidden'}>
                       <motion.div
                         initial={{ opacity: 0, x: -12 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -963,7 +1045,9 @@ const AdminProducts = () => {
                           </div>
                         </div>
                       </motion.div>
+                      </div>
 
+                      <div className={activeTab === 'inventory' ? 'space-y-6' : 'hidden'}>
                       <motion.div
                         initial={{ opacity: 0, x: -12 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -1014,7 +1098,9 @@ const AdminProducts = () => {
                           </div>
                         )}
                       </motion.div>
+                      </div>
 
+                      <div className={activeTab === 'variants' ? 'space-y-6' : 'hidden'}>
                       <motion.div
                         initial={{ opacity: 0, x: -12 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -1237,7 +1323,9 @@ const AdminProducts = () => {
                           </div>
                         )}
                       </motion.div>
+                      </div>
 
+                      <div className={activeTab === 'seo' ? 'space-y-6' : 'hidden'}>
                       <motion.div
                         initial={{ opacity: 0, x: -12 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -1294,6 +1382,7 @@ const AdminProducts = () => {
                           </label>
                         </div>
                       </motion.div>
+                      </div>
                     </div>
 
                     <motion.div
@@ -1510,9 +1599,9 @@ const AdminProducts = () => {
                     Cancel
                   </button>
                   <button
-                    form="product-form"
-                    type="submit"
+                    type="button"
                     disabled={addMutation.isPending || updateMutation.isPending}
+                    onClick={() => handleSubmit()}
                     className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-50 shadow-lg shadow-indigo-500/20"
                   >
                     {(addMutation.isPending || updateMutation.isPending) ? (

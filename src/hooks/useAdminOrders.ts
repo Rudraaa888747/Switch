@@ -202,8 +202,7 @@ export const useAdminOrders = (filters: AdminOrdersFilters) => {
     gcTime: 15 * 60_000,
     retry: 1,
     placeholderData: keepPreviousData,
-    refetchInterval: 15_000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {

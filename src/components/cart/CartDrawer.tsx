@@ -49,16 +49,15 @@ export default function CartDrawer() {
 
             <div className="custom-scrollbar flex-1 overflow-y-auto px-4 py-4 md:px-6">
               {items.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center text-center">
-                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                    <ShoppingBag size={28} className="text-muted-foreground/45" />
-                  </div>
-                  <p className="text-lg font-medium">Your cart is empty</p>
-                  <p className="mt-2 max-w-[16rem] text-sm leading-6 text-muted-foreground">
-                    Start building a cleaner, sharper wardrobe with pieces curated for motion.
+                <div className="flex h-full flex-col items-center justify-center text-center p-6">
+                  <ShoppingBag size={56} className="mb-8 stroke-[1] text-foreground/30" />
+                  <p className="text-2xl font-light tracking-wide">Your selection awaits.</p>
+                  <p className="mt-4 max-w-[16rem] text-sm leading-relaxed text-muted-foreground/80">
+                    Discover premium essentials engineered for modern movement.
                   </p>
-                  <button onClick={closeDrawer} className="mt-5 rounded-full border border-border px-5 py-3 text-xs uppercase tracking-[0.24em]">
-                    Continue Shopping
+                  <button onClick={closeDrawer} className="btn-primary mt-8 inline-flex items-center gap-2 px-8 py-3.5 text-[10px]">
+                    Explore Collection
+                    <ArrowRight size={14} className="transition-transform duration-500 group-hover:translate-x-1" />
                   </button>
                 </div>
               ) : (

@@ -86,38 +86,6 @@ const DEFAULT_STAFF: AdminStaff[] = [
       { id: 'manage_marketing', label: 'Manage Marketing', granted: true },
     ],
   },
-  {
-    id: 'staff-2',
-    name: 'Sarah Chen',
-    email: 'sarah@switch.com',
-    role: 'manager',
-    lastActive: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    permissions: [
-      { id: 'manage_products', label: 'Manage Products', granted: true },
-      { id: 'manage_orders', label: 'Manage Orders', granted: true },
-      { id: 'manage_users', label: 'Manage Users', granted: true },
-      { id: 'manage_staff', label: 'Manage Staff', granted: false },
-      { id: 'view_reports', label: 'View Reports', granted: true },
-      { id: 'manage_settings', label: 'Manage Settings', granted: false },
-      { id: 'manage_marketing', label: 'Manage Marketing', granted: true },
-    ],
-  },
-  {
-    id: 'staff-3',
-    name: 'Alex Rivera',
-    email: 'alex@switch.com',
-    role: 'editor',
-    lastActive: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    permissions: [
-      { id: 'manage_products', label: 'Manage Products', granted: true },
-      { id: 'manage_orders', label: 'Manage Orders', granted: false },
-      { id: 'manage_users', label: 'Manage Users', granted: false },
-      { id: 'manage_staff', label: 'Manage Staff', granted: false },
-      { id: 'view_reports', label: 'View Reports', granted: true },
-      { id: 'manage_settings', label: 'Manage Settings', granted: false },
-      { id: 'manage_marketing', label: 'Manage Marketing', granted: false },
-    ],
-  },
 ];
 
 export const AdminProvider = ({ children }: { children: ReactNode }) => {
@@ -137,24 +105,53 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   }, [staffMembers]);
 
   useEffect(() => {
-    const adminSession = sessionStorage.getItem('admin_session');
-    if (adminSession) {
+    const initializeAdminAuth = async () => {
       try {
-        const session = JSON.parse(adminSession);
-        if (session.authenticated && session.name) {
-          setIsAdminAuthenticated(true);
-          setAdminName(session.name);
-          setAdminRole(session.role || 'super_admin');
-          setAdminAvatar(session.avatar || null);
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          // Check if this user is an admin
+          const { data: adminData } = await supabase
+            .from('admin_users')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .eq('is_active', true)
+            .single();
+
+          if (adminData) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('display_name, avatar_url')
+              .eq('user_id', session.user.id)
+              .single();
+
+            setIsAdminAuthenticated(true);
+            setAdminName(profile?.display_name || session.user.email?.split('@')[0] || 'Admin');
+            setAdminRole(adminData.role as 'super_admin' | 'manager' | 'editor' | 'support');
+            setAdminAvatar(profile?.avatar_url || null);
+          } else {
+            // Not an admin, clear session state
+            setIsAdminAuthenticated(false);
+          }
+        } else {
+          setIsAdminAuthenticated(false);
         }
-      } catch {
-        sessionStorage.removeItem('admin_session');
+      } catch (error) {
+        console.error('Error verifying admin session:', error);
+        setIsAdminAuthenticated(false);
+      } finally {
+        setIsLoading(false);
       }
-    }
-    setIsLoading(false);
+    };
+
+    initializeAdminAuth();
   }, []);
 
+  // Only load notifications and subscribe to realtime AFTER admin is authenticated.
+  // This prevents unnecessary DB queries and WebSocket connections for regular visitors.
   useEffect(() => {
+    if (!isAdminAuthenticated) return;
+
     const mapNotification = (item: AdminNotificationRecord): AdminNotification => ({
       id: item.id,
       title: item.title,
@@ -187,66 +184,77 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [isAdminAuthenticated]);
 
   const adminLogin = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     if (!username.trim() || !password.trim()) {
       return { success: false, error: 'Please enter both username and password' };
     }
 
-    if (username.trim() === 'demo123' && password === 'demo123') {
-      setIsAdminAuthenticated(true);
-      setAdminName('Demo Admin');
-      setAdminRole('super_admin');
-      setAdminAvatar(null);
-      sessionStorage.setItem('admin_session', JSON.stringify({
-        authenticated: true,
-        name: 'Demo Admin',
-        role: 'super_admin',
-        avatar: null,
-        timestamp: Date.now(),
-      }));
-      return { success: true };
-    }
-
     try {
-      const { data, error } = await supabase.rpc('admin_login', {
-        p_username: username.trim(),
-        p_password: password,
+      // 1. Authenticate with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: username.trim(),
+        password: password,
       });
 
-      if (error) {
-        return { success: false, error: 'Database error. Please try again.' };
+      if (authError || !authData.user) {
+        return { success: false, error: 'Invalid credentials or access denied' };
       }
 
-      const result = Array.isArray(data) ? data[0] : data;
+      // 2. Fetch admin role from admin_users table securely
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_users')
+        .select('role')
+        .eq('user_id', authData.user.id)
+        .eq('is_active', true)
+        .single();
 
-      if (result?.success) {
-        setIsAdminAuthenticated(true);
-        setAdminName(result.admin_name);
-        setAdminRole(result.role || 'super_admin');
-        setAdminAvatar(result.avatar || null);
-        sessionStorage.setItem('admin_session', JSON.stringify({
-          authenticated: true,
-          name: result.admin_name,
-          role: result.role || 'super_admin',
-          avatar: result.avatar || null,
-          timestamp: Date.now(),
-        }));
-        return { success: true };
+      if (adminError || !adminData) {
+        // If not an admin, sign out immediately
+        await supabase.auth.signOut();
+        return { success: false, error: 'Unauthorized: Admin access required' };
       }
 
-      return { success: false, error: 'Invalid username or password' };
+      const role = adminData.role || 'support';
+      
+      // Get profile name if available
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name, avatar_url')
+        .eq('user_id', authData.user.id)
+        .single();
+
+      const name = profile?.display_name || authData.user.email?.split('@')[0] || 'Admin';
+
+      setIsAdminAuthenticated(true);
+      setAdminName(name);
+      setAdminRole(role as 'super_admin' | 'manager' | 'editor' | 'support');
+      setAdminAvatar(profile?.avatar_url || null);
+      
+      sessionStorage.setItem('admin_session', JSON.stringify({
+        authenticated: true,
+        name,
+        role,
+        avatar: profile?.avatar_url || null,
+        timestamp: Date.now(),
+      }));
+      
+      return { success: true };
     } catch {
       return { success: false, error: 'Connection error. Please try again.' };
     }
+
+
   };
 
-  const adminLogout = () => {
+  const adminLogout = async () => {
+    await supabase.auth.signOut();
     setIsAdminAuthenticated(false);
     setAdminName(null);
-    setAdminRole('super_admin');
+    setAdminRole('support'); // Reset to lowest privilege — not 'super_admin'
     setAdminAvatar(null);
+    setNotifications([]);
     sessionStorage.removeItem('admin_session');
   };
 
@@ -276,11 +284,16 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const hasPermission = useCallback((permissionId: string): boolean => {
+    // super_admin always has all permissions
+    if (adminRole === 'super_admin') return true;
+    // For other roles, check their staff record by matching via userId in the future.
+    // For now, find by name (cosmetic — real enforcement is server-side via admin_users table).
     const currentStaff = staffMembers.find(s => s.name === adminName);
-    if (!currentStaff) return true;
+    // If no matching staff record, DENY by default (fail-closed)
+    if (!currentStaff) return false;
     const permission = currentStaff.permissions.find(p => p.id === permissionId);
-    return permission?.granted ?? true;
-  }, [staffMembers, adminName]);
+    return permission?.granted ?? false;
+  }, [staffMembers, adminName, adminRole]);
 
   return (
     <AdminContext.Provider

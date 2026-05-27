@@ -508,7 +508,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         supabaseUser,
         session,
-        isAuthenticated: !!user,
+        isAuthenticated: !!supabaseUser,
         isAuthReady: !isInitializing,
         login,
         signup,

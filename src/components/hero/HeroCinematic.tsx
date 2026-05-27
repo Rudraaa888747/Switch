@@ -44,15 +44,19 @@ export default function HeroCinematic() {
       <div className="md:hidden">
         <section className="relative flex min-h-[100dvh] items-end overflow-hidden bg-black">
           <motion.div className="absolute inset-0 gpu-layer" style={{ scale: imageScale, y: imageY }}>
-            <div className="image-fade-wrap h-full w-full" data-loaded={imageLoaded}>
+            <div className="h-full w-full bg-neutral-900">
               <img
                 src="/hero/hero-image.png"
                 alt="SWITCH luxury collection"
                 loading="eager"
                 fetchPriority="high"
                 onLoad={() => setImageLoaded(true)}
-                data-loaded={imageLoaded}
-                className="image-fade h-full w-full object-cover object-[center_28%]"
+                className="h-full w-full object-cover object-[center_28%]"
+                style={{
+                  filter: imageLoaded ? 'blur(0px)' : 'blur(24px)',
+                  opacity: imageLoaded ? 1 : 0,
+                  transition: 'filter 1.2s cubic-bezier(0.83, 0, 0.17, 1), opacity 1.2s cubic-bezier(0.83, 0, 0.17, 1)'
+                }}
               />
             </div>
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12)_0%,rgba(0,0,0,0.28)_35%,rgba(0,0,0,0.76)_100%)]" />
@@ -70,7 +74,7 @@ export default function HeroCinematic() {
                 to="/shop"
                 className="tap-lift touch-pill btn-shine inline-flex items-center gap-2 bg-foreground px-8 py-3.5 text-[11px] font-medium uppercase tracking-[0.24em] text-background shadow-[0_24px_48px_-26px_rgba(0,0,0,0.7)]"
               >
-                Explore Collection
+                Explore Drop
                 <ArrowRight size={14} />
               </Link>
             </div>
@@ -79,12 +83,17 @@ export default function HeroCinematic() {
 
         <section className="relative min-h-[100dvh] overflow-hidden bg-black">
           <motion.div className="absolute inset-0 gpu-layer" style={{ scale: videoScale, y: videoY }}>
-            <div className="absolute inset-0 bg-neutral-950" style={{ opacity: videoReady ? 0 : 1, transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)' }} />
+            <div className="absolute inset-0 bg-neutral-950" style={{ opacity: videoReady ? 0 : 1, transition: 'opacity 1.2s cubic-bezier(0.83, 0, 0.17, 1)' }} />
             <img
               src="/hero/hero-image.png"
               alt=""
               aria-hidden="true"
-              className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-700 ${videoReady ? 'opacity-0' : 'opacity-100'}`}
+              className="absolute inset-0 h-full w-full object-cover object-center"
+              style={{
+                filter: videoReady ? 'blur(10px)' : 'blur(0px)',
+                opacity: videoReady ? 0 : 1,
+                transition: 'opacity 1.2s cubic-bezier(0.83, 0, 0.17, 1), filter 1.2s cubic-bezier(0.83, 0, 0.17, 1)'
+              }}
             />
             <video
               ref={videoRef}
@@ -94,10 +103,10 @@ export default function HeroCinematic() {
               loop
               preload="auto"
               poster="/hero/hero-image.png"
-              className="h-full w-full object-cover object-center"
+              className="absolute inset-0 h-full w-full object-cover object-center"
               style={{
                 opacity: videoReady ? 1 : 0,
-                transition: 'opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1)',
+                transition: 'opacity 1.2s cubic-bezier(0.83, 0, 0.17, 1)',
                 transform: 'translateZ(0)',
               }}
               disablePictureInPicture
@@ -109,14 +118,7 @@ export default function HeroCinematic() {
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.38)_0%,rgba(0,0,0,0.18)_28%,rgba(0,0,0,0.6)_100%)]" />
           </motion.div>
 
-          <div className="relative z-10 flex min-h-[100dvh] items-end px-5 pb-[calc(var(--mobile-content-bottom)+1.5rem)]">
-            <div className="max-w-[16rem] rounded-[1.75rem] border border-white/12 bg-black/18 p-4 backdrop-blur-sm">
-              <p className="text-[10px] uppercase tracking-[0.28em] text-white/52">Cinematic Motion</p>
-              <p className="mt-2 text-sm leading-6 text-white/72">
-                Scroll-led reveal, optimized mobile playback, and editorial framing with no black flashes or letterboxing.
-              </p>
-            </div>
-          </div>
+
         </section>
       </div>
 
@@ -133,7 +135,7 @@ export default function HeroCinematic() {
           </div>
 
           <div className="relative h-full w-1/2 overflow-hidden bg-neutral-900">
-            <div className="absolute inset-0 flex items-center justify-center bg-neutral-900" style={{ opacity: videoReady ? 0 : 1, transition: 'opacity 0.6s ease' }}>
+            <div className="absolute inset-0 flex items-center justify-center bg-neutral-900" style={{ opacity: videoReady ? 0 : 1, transition: 'opacity 1.2s cubic-bezier(0.83, 0, 0.17, 1)' }}>
               <span className="text-[10px] uppercase tracking-[0.3em] text-white/10">Loading</span>
             </div>
             <video
@@ -144,10 +146,10 @@ export default function HeroCinematic() {
               loop
               preload="auto"
               poster="/hero/hero-image.png"
-              className="h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full object-cover"
               style={{
                 opacity: videoReady ? 1 : 0,
-                transition: 'opacity 0.8s ease',
+                transition: 'opacity 1.2s cubic-bezier(0.83, 0, 0.17, 1)',
                 transform: 'translateZ(0)',
               }}
               disablePictureInPicture
@@ -178,8 +180,8 @@ export default function HeroCinematic() {
               to="/shop"
               className="group inline-flex items-center gap-2 bg-foreground px-10 py-4 text-xs font-medium uppercase tracking-[0.15em] text-background transition-all duration-500 hover:bg-foreground/90"
             >
-              Explore Collection
-              <ArrowRight size={14} className="transition-transform duration-300 group-hover:translate-x-1" />
+              Explore Drop
+              <ArrowRight size={14} className="transition-transform duration-500 ease-[cubic-bezier(0.83,0,0.17,1)] group-hover:translate-x-1.5" />
             </Link>
           </div>
         </div>

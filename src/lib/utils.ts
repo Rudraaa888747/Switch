@@ -5,11 +5,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function normalizeImageUrl(url?: string | null) {
+interface ImageOptimizationOptions {
+  width?: number;
+  quality?: number;
+  format?: 'webp' | 'avif' | 'origin';
+  resize?: 'cover' | 'contain' | 'fill';
+}
+
+export function normalizeImageUrl(url?: string | null, options?: ImageOptimizationOptions) {
   if (!url) return "";
   
-  // If it's already a full URL, just clean it up
   if (url.startsWith('http')) {
+    if (url.includes('supabase.co/storage/v1/object/public/') && options) {
+      const { width = 800, quality = 80, format = 'webp', resize = 'cover' } = options;
+      return url.replace('/object/public/', `/render/image/public/`) + `?width=${width}&quality=${quality}&format=${format}&resize=${resize}`;
+    }
     try {
       const u = new URL(url);
       return u.toString();
@@ -18,18 +28,17 @@ export function normalizeImageUrl(url?: string | null) {
     }
   }
 
-  // Handle relative paths from Supabase
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const bucket = import.meta.env.VITE_SUPABASE_PRODUCT_IMAGE_BUCKET || 'products';
   
   if (supabaseUrl && !url.includes('supabase.co')) {
-    // Remove leading slash if present
     const cleanPath = url.startsWith('/') ? url.substring(1) : url;
-    // Check if the path already contains the bucket name
-    if (cleanPath.startsWith(bucket + '/')) {
-      return `${supabaseUrl}/storage/v1/object/public/${cleanPath}`;
-    }
-    return `${supabaseUrl}/storage/v1/object/public/${bucket}/${cleanPath}`;
+    const finalPath = cleanPath.startsWith(bucket + '/') ? cleanPath : `${bucket}/${cleanPath}`;
+    const width = options?.width || 800;
+    const quality = options?.quality || 80;
+    const format = options?.format || 'webp';
+    const resize = options?.resize || 'cover';
+    return `${supabaseUrl}/storage/v1/render/image/public/${finalPath}?width=${width}&quality=${quality}&format=${format}&resize=${resize}`;
   }
   
   return url;
@@ -338,16 +347,16 @@ export function getProductImage(product: {
   variants?: { color: string; images: string[] }[];
   image?: string;
   images?: string[];
-}, selectedColor?: string): string {
+}, selectedColor?: string, options?: ImageOptimizationOptions): string {
   if (product.variants && product.variants.length > 0) {
     const variant = selectedColor 
       ? product.variants.find(v => v.color === selectedColor) || product.variants[0]
       : product.variants[0];
     if (variant?.images?.[0]) {
-      return normalizeImageUrl(variant.images[0]);
+      return normalizeImageUrl(variant.images[0], options);
     }
   }
-  return normalizeImageUrl(product.image || product.images?.[0] || '');
+  return normalizeImageUrl(product.image || product.images?.[0] || '', options);
 }
 
 // ─── Smart Product Tagging ──────────────────────────────────────────

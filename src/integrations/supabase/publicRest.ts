@@ -1,3 +1,5 @@
+import { supabase } from './client';
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -54,9 +56,19 @@ export const supabaseRestRequest = async <T>(
     authToken?: string | null;
   }
 ) => {
+  let token = options?.authToken;
+  if (!token) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      token = session?.access_token || null;
+    } catch {
+      // ignore
+    }
+  }
+
   const normalizedHeaders = {
     ...getRestHeaders(options?.headers),
-    ...(options?.authToken ? { Authorization: `Bearer ${options.authToken}` } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
   if ((options?.method === 'POST' || options?.method === 'PATCH') && !normalizedHeaders['Content-Type']) {
@@ -88,6 +100,16 @@ export const supabaseRestInsert = async <T>(
   payload: Record<string, unknown> | Record<string, unknown>[],
   authToken?: string | null
 ) => {
+  let token = authToken;
+  if (!token) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      token = session?.access_token || null;
+    } catch {
+      // ignore
+    }
+  }
+
   const response = await fetch(buildRestUrl(path), {
     method: 'POST',
     headers: {
@@ -95,7 +117,7 @@ export const supabaseRestInsert = async <T>(
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
       }),
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(payload),
   });
@@ -109,6 +131,16 @@ export const supabaseRestUpdate = async <T>(
   searchParams?: URLSearchParams,
   authToken?: string | null
 ) => {
+  let token = authToken;
+  if (!token) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      token = session?.access_token || null;
+    } catch {
+      // ignore
+    }
+  }
+
   const response = await fetch(buildRestUrl(path, searchParams), {
     method: 'PATCH',
     headers: {
@@ -116,7 +148,7 @@ export const supabaseRestUpdate = async <T>(
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
       }),
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(payload),
   });
@@ -125,13 +157,23 @@ export const supabaseRestUpdate = async <T>(
 };
 
 export const supabaseRestDelete = async (path: string, searchParams?: URLSearchParams, authToken?: string | null) => {
+  let token = authToken;
+  if (!token) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      token = session?.access_token || null;
+    } catch {
+      // ignore
+    }
+  }
+
   const response = await fetch(buildRestUrl(path, searchParams), {
     method: 'DELETE',
     headers: {
       ...getRestHeaders({
       Prefer: 'return=representation',
       }),
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
 

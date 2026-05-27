@@ -19,7 +19,7 @@ const OVERVIEW_ORDER_COLUMNS = 'id, order_id, customer_name, status, total, subt
 
 export const fetchAdminOverview = async (): Promise<AdminOverviewData> => {
   const [{ data: orders, error: ordersError }, { count: reviewsCount, error: reviewsError }, { data: rawProducts, count: productCount, error: productError }] = await Promise.all([
-    supabase.from('orders').select(OVERVIEW_ORDER_COLUMNS).order('created_at', { ascending: false }),
+    supabase.from('orders').select(OVERVIEW_ORDER_COLUMNS).order('created_at', { ascending: false }).limit(200),
     supabase.from('reviews').select('id', { count: 'exact', head: true }),
     supabase.from('products').select('*', { count: 'exact' }),
   ]);
@@ -139,7 +139,7 @@ export const fetchAdminOverview = async (): Promise<AdminOverviewData> => {
     lowStockCount,
     recentOrders: groupedOrders.slice(0, 5),
     monthlyData,
-    categoryData: categoryData.length > 0 ? categoryData : [{ name: 'Lifestyle', value: 400 }, { name: 'Essentials', value: 300 }]
+    categoryData: categoryData.length > 0 ? categoryData : [],
   };
 };
 

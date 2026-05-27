@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Product } from '@/data/products';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { mapDbProductToProduct, DbProduct } from '@/hooks/useProducts';
 
 interface CartItem {
   product: Product;
@@ -39,7 +40,7 @@ const loadLocal = (): CartItem[] => {
 };
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isAuthenticated, session } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [items, setItems] = useState<CartItem[]>(loadLocal);
   const [synced, setSynced] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -58,23 +59,52 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (serverItems && serverItems.length > 0) {
           // Merge server items with local items — prefer local (has full Product data)
           const local = loadLocal();
-          // Start with local items
           const merged = [...local];
+          
+          // Find which product IDs are missing from local cart
+          const missingProductIds = serverItems
+            .filter(si => !merged.find(m => m.product.id === si.product_id))
+            .map(si => si.product_id);
+            
+          const uniqueMissingIds = [...new Set(missingProductIds)];
+          const fetchedProducts: Record<string, Product> = {};
+          
+          // Fetch the missing products from the database
+          if (uniqueMissingIds.length > 0) {
+            const { data: missingProducts } = await supabase
+              .from('products')
+              .select('*')
+              .in('id', uniqueMissingIds);
+              
+            if (missingProducts) {
+              missingProducts.forEach(dbProd => {
+                fetchedProducts[dbProd.id] = mapDbProductToProduct(dbProd as unknown as DbProduct);
+              });
+            }
+          }
+
           // Add server-only items that aren't already in local
           for (const si of serverItems) {
             if (!merged.find(m => m.product.id === si.product_id && m.size === si.size && m.color === si.color)) {
-              merged.push({
-                product: { id: si.product_id } as Product,
-                quantity: si.quantity,
-                size: si.size,
-                color: si.color,
-              });
+              // Try to get the product from local cart first, otherwise from the fetched products
+              const localProd = merged.find(m => m.product.id === si.product_id)?.product;
+              const product = localProd || fetchedProducts[si.product_id];
+              
+              if (product) {
+                merged.push({
+                  product,
+                  quantity: si.quantity,
+                  size: si.size,
+                  color: si.color,
+                });
+              }
             }
           }
           setItems(merged);
         }
         setSynced(true);
-      } catch {
+      } catch (err) {
+        console.error("Failed to load server cart:", err);
         // Table may not exist yet, use local
         setSynced(true);
       }
@@ -114,7 +144,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     
     syncToServer();
-  }, [items, isAuthenticated, user, session, synced]);
+  }, [items, isAuthenticated, user, synced]);
 
   const addToCart = useCallback((product: Product, size: string, color: string, quantity = 1) => {
     setItems(prev => {

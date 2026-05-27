@@ -37,6 +37,7 @@ export interface Product {
 export const products: Product[] = [];
 
 export const formatPrice = (price: number): string => {
+  if (!Number.isFinite(price)) return '—';
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',

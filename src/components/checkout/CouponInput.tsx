@@ -99,19 +99,39 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputPr
     }
 
     try {
-      const fetchPromise = supabase
-        .from('coupons')
-        .select('*')
-        .eq('code', key)
-        .eq('is_active', true)
-        .maybeSingle();
+      let data: any = null;
+      let fetchError: any = null;
+      let retries = 2;
+      
+      while (retries >= 0) {
+        try {
+          const fetchPromise = supabase
+            .from('coupons')
+            .select('*')
+            .eq('code', key)
+            .eq('is_active', true)
+            .maybeSingle();
 
-      const { data, error: fetchError } = await Promise.race([
-        fetchPromise,
-        new Promise<{ data: unknown; error: unknown }>((_, reject) => 
-          setTimeout(() => reject(new Error('Request timed out')), 8000)
-        )
-      ]);
+          const res = await Promise.race([
+            fetchPromise,
+            new Promise<{ data: any; error: any }>((_, reject) => 
+              setTimeout(() => reject(new Error('Request timed out')), 6000)
+            )
+          ]);
+          
+          if (res.error) throw res.error;
+          data = res.data;
+          fetchError = null;
+          break; // success
+        } catch (err: any) {
+          if (err.message === 'Request timed out' && retries > 0) {
+            retries--;
+            continue;
+          }
+          fetchError = err;
+          break;
+        }
+      }
 
       if (fetchError) throw fetchError;
 
@@ -262,7 +282,11 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputPr
                 transition={{ delay: 0.6 }}
                 className="text-2xl md:text-3xl font-semibold text-foreground mb-4"
               >
-                You got <span className="text-primary font-bold">50% OFF!</span>
+                You got <span className="text-primary font-bold">
+                  {appliedCoupon?.discount_type === 'percentage' 
+                    ? `${appliedCoupon.discount_value}% OFF!` 
+                    : `₹${appliedCoupon?.discount_value} OFF!`}
+                </span>
               </motion.p>
 
               <motion.div

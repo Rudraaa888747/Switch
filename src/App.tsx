@@ -15,6 +15,8 @@ import ScrollToTop from "./components/layout/ScrollToTop";
 import FloatingChatWidget from "./components/chat/FloatingChatWidget";
 import CartDrawer from "./components/cart/CartDrawer";
 import { PageSkeleton } from "./components/ui/PageSkeleton";
+import ProtectedAdminRoute from "./components/admin/ProtectedAdminRoute";
+import ErrorBoundary from "./components/ui/ErrorBoundary";
 
 const Auth = lazy(() => import("./pages/Auth"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -50,84 +52,105 @@ const AdminReports = lazy(() => import("./pages/admin/AdminReports"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const AdminStaff = lazy(() => import("./pages/admin/AdminStaff"));
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 15_000,
-      gcTime: 5 * 60_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
+// QueryClient is cached in globalThis during dev HMR to prevent stale data
+const createQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 15_000,
+        gcTime: 5 * 60_000,
+        retry: 1,
+        refetchOnWindowFocus: false,
+      },
+      mutations: {
+        retry: 0,
+      },
     },
-    mutations: {
-      retry: 0,
-    },
-  },
-});
+  });
+
+type GlobalCache = { _queryClient?: QueryClient };
+const g = globalThis as unknown as GlobalCache;
+const queryClient = import.meta.env.DEV
+  ? (g._queryClient ??= createQueryClient())
+  : createQueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <AuthProvider>
-        <AdminProvider>
-          <CartProvider>
-            <WishlistProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
-                  <ScrollToTop />
-                  <Suspense fallback={<PageSkeleton />}>
-                    <Routes>
-                      <Route path="/auth" element={<Auth />} />
-                      <Route path="/forgot-password" element={<ForgotPassword />} />
-                      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-                      <Route path="/admin/login" element={<AdminLogin />} />
-                      <Route element={<Layout />}>
-                        <Route path="/" element={<Home />} />
-                        <Route path="/about" element={<About />} />
-                        <Route path="/shop" element={<Shop />} />
-                        <Route path="/men" element={<Men />} />
-                        <Route path="/women" element={<Women />} />
-                        <Route path="/product/:id" element={<ProductDetail />} />
-                        <Route path="/ai-assistant" element={<AIAssistant />} />
-                        <Route path="/style-advisor" element={<StyleAdvisor />} />
-                        <Route path="/outfit-matching" element={<OutfitMatching />} />
-                        <Route path="/cart" element={<Cart />} />
-                        <Route path="/checkout" element={<Checkout />} />
-                        <Route path="/profile" element={<Profile />} />
-                        <Route path="/wallet" element={<Wallet />} />
-                        <Route path="/wishlist" element={<Wishlist />} />
-                        <Route path="/orders" element={<MyOrders />} />
-                        <Route path="*" element={<NotFound />} />
-                      </Route>
-                      <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                      <Route path="/admin/products" element={<AdminProducts />} />
-                      <Route path="/admin/orders" element={<AdminOrders />} />
-                      <Route path="/admin/users" element={<AdminUsers />} />
-                      <Route path="/admin/reviews" element={<AdminReviews />} />
-                      <Route path="/admin/inventory" element={<AdminInventory />} />
-                      <Route path="/admin/analytics" element={<AdminAnalytics />} />
-                      <Route path="/admin/returns" element={<AdminReturns />} />
-                      <Route path="/admin/marketing" element={<AdminMarketing />} />
-                      <Route path="/admin/marketing/:section" element={<AdminMarketing />} />
-                      <Route path="/admin/reports" element={<AdminReports />} />
-                      <Route path="/admin/reports/:section" element={<AdminReports />} />
-                      <Route path="/admin/settings" element={<AdminSettings />} />
-                      <Route path="/admin/settings/:section" element={<AdminSettings />} />
-                      <Route path="/admin/staff" element={<AdminStaff />} />
-                      <Route path="/admin/staff/:section" element={<AdminStaff />} />
-                    </Routes>
-                    <FloatingChatWidget />
-                    <CartDrawer />
-                  </Suspense>
-                </BrowserRouter>
-              </TooltipProvider>
-            </WishlistProvider>
-          </CartProvider>
-        </AdminProvider>
-      </AuthProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+  <ErrorBoundary label="Application">
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <AdminProvider>
+            <CartProvider>
+              <WishlistProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
+                    <ScrollToTop />
+                    <Suspense fallback={<PageSkeleton />}>
+                      <Routes>
+                        {/* ── Public routes ── */}
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+
+                        {/* ── Admin auth (public) ── */}
+                        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+                        <Route path="/admin/login" element={<AdminLogin />} />
+
+                        {/* ── Storefront routes ── */}
+                        <Route element={<Layout />}>
+                          <Route path="/" element={<Home />} />
+                          <Route path="/about" element={<About />} />
+                          <Route path="/shop" element={<Shop />} />
+                          <Route path="/men" element={<Men />} />
+                          <Route path="/women" element={<Women />} />
+                          <Route path="/product/:id" element={<ProductDetail />} />
+                          <Route path="/ai-assistant" element={<AIAssistant />} />
+                          <Route path="/style-advisor" element={<StyleAdvisor />} />
+                          <Route path="/outfit-matching" element={<OutfitMatching />} />
+                          <Route path="/cart" element={<Cart />} />
+                          <Route path="/checkout" element={<Checkout />} />
+                          <Route path="/profile" element={<Profile />} />
+                          <Route path="/wallet" element={<Wallet />} />
+                          <Route path="/wishlist" element={<Wishlist />} />
+                          <Route path="/orders" element={<MyOrders />} />
+                          <Route path="*" element={<NotFound />} />
+                        </Route>
+
+                        {/* ── Protected admin routes (ALL behind ProtectedAdminRoute) ── */}
+                        <Route element={<ProtectedAdminRoute />}>
+                          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                          <Route path="/admin/products" element={<AdminProducts />} />
+                          <Route path="/admin/orders" element={<AdminOrders />} />
+                          <Route path="/admin/users" element={<AdminUsers />} />
+                          <Route path="/admin/reviews" element={<AdminReviews />} />
+                          <Route path="/admin/inventory" element={<AdminInventory />} />
+                          <Route path="/admin/analytics" element={<AdminAnalytics />} />
+                          <Route path="/admin/returns" element={<AdminReturns />} />
+                          <Route path="/admin/marketing" element={<AdminMarketing />} />
+                          <Route path="/admin/marketing/:section" element={<AdminMarketing />} />
+                          <Route path="/admin/reports" element={<AdminReports />} />
+                          <Route path="/admin/reports/:section" element={<AdminReports />} />
+                          <Route path="/admin/settings" element={<AdminSettings />} />
+                          <Route path="/admin/settings/:section" element={<AdminSettings />} />
+                          <Route path="/admin/staff" element={<AdminStaff />} />
+                          <Route path="/admin/staff/:section" element={<AdminStaff />} />
+                        </Route>
+                      </Routes>
+
+                      {/* Global overlays — not rendered on admin pages by design */}
+                      <FloatingChatWidget />
+                      <CartDrawer />
+                    </Suspense>
+                  </BrowserRouter>
+                </TooltipProvider>
+              </WishlistProvider>
+            </CartProvider>
+          </AdminProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
