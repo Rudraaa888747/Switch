@@ -62,7 +62,7 @@ as $$
     o.cancelled_at
   from public.orders o
   where
-    (p_status is null or o.status = p_status)
+    (p_status is null or o.status::text = p_status)
     and (
       p_search is null
       or o.order_number ilike '%' || p_search || '%'
