@@ -43,8 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_status_created_at ON public.orders (status
 
 -- Optimize the orders table with better constraints
 ALTER TABLE public.orders
-ADD CONSTRAINT orders_order_id_unique UNIQUE (order_id),
-ADD CONSTRAINT orders_status_check CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'));
+ADD CONSTRAINT orders_order_id_unique UNIQUE (order_id);
 
 -- Add comments for better performance monitoring
 COMMENT ON TABLE public.orders IS 'E-commerce orders with optimized RLS policies for fast checkout';
