@@ -1,5 +1,21 @@
 -- Secure order placement that acts as the single source of truth.
 -- Validates stock, calculates prices from the products table, applies discounts, and processes wallet payments safely.
+-- Secure order placement that acts as the single source of truth.
+-- Validates stock, calculates prices from the products table, applies discounts, and processes wallet payments safely.
+
+DROP FUNCTION IF EXISTS public.place_order_secure(
+  JSONB,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  BOOLEAN,
+  TEXT
+);
 
 CREATE OR REPLACE FUNCTION public.place_order_secure(
   p_items JSONB, -- Array of objects: { product_id: text, quantity: int, size: text, color: text }

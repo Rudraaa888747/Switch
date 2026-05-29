@@ -8,6 +8,20 @@
 -- 1. FIX STOCK RACE CONDITION IN place_order_secure
 --    Replace two-step read+decrement with atomic conditional UPDATE
 -- ────────────────────────────────────────────────────────────
+DROP FUNCTION IF EXISTS public.place_order_secure(
+  JSONB,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  TEXT,
+  BOOLEAN,
+  TEXT
+);
+
 CREATE OR REPLACE FUNCTION public.place_order_secure(
   p_items JSONB,
   p_customer_name TEXT,
