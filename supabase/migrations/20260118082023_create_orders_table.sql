@@ -1,5 +1,5 @@
 -- Create orders table for order tracking
-CREATE TABLE public.orders (
+CREATE TABLE IF NOT EXISTS public.orders (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   order_id TEXT NOT NULL UNIQUE,
   user_id UUID REFERENCES auth.users(id),
