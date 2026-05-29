@@ -15,22 +15,22 @@ create or replace function public.admin_fetch_orders(
 )
 returns table (
   id uuid,
-  order_id text,
+  order_number text,
   user_id uuid,
   customer_name text,
   customer_phone text,
-  shipping_address text,
-  shipping_city text,
-  shipping_state text,
-  shipping_pincode text,
-  items jsonb,
-  subtotal numeric,
-  tax numeric,
-  shipping numeric,
-  total numeric,
+  customer_email text,
+  shipping_address jsonb,
+  subtotal_amount integer,
+  discount_amount integer,
+  tax_amount integer,
+  shipping_amount integer,
+  grand_total_amount integer,
+  item_count integer,
   payment_method text,
+  order_notes text,
   status text,
-  estimated_delivery text,
+  estimated_delivery_at timestamptz,
   created_at timestamptz,
   updated_at timestamptz,
   cancelled_at timestamptz
@@ -41,22 +41,22 @@ set search_path = public
 as $$
   select
     o.id,
-    COALESCE(o.order_id, o.order_number) AS order_id,
+    o.order_number,
     o.user_id,
     o.customer_name,
     o.customer_phone,
+    o.customer_email,
     o.shipping_address,
-    o.shipping_city,
-    o.shipping_state,
-    o.shipping_pincode,
-    o.items,
-    o.subtotal,
-    o.tax,
-    o.shipping,
-    o.total,
+    o.subtotal_amount,
+    o.discount_amount,
+    o.tax_amount,
+    o.shipping_amount,
+    o.grand_total_amount,
+    o.item_count,
     o.payment_method,
+    o.order_notes,
     o.status,
-    o.estimated_delivery,
+    o.estimated_delivery_at,
     o.created_at,
     o.updated_at,
     o.cancelled_at
@@ -65,7 +65,7 @@ as $$
     (p_status is null or o.status = p_status)
     and (
       p_search is null
-      or COALESCE(o.order_id, o.order_number) ilike '%' || p_search || '%'
+      or o.order_number ilike '%' || p_search || '%'
       or o.customer_name ilike '%' || p_search || '%'
     )
   order by o.created_at desc
