@@ -53,24 +53,12 @@ CREATE POLICY "Users can view own wallet transactions"
 DROP POLICY IF EXISTS "Admin can view all wallet transactions" ON wallet_transactions;
 CREATE POLICY "Admin can view all wallet transactions"
   ON wallet_transactions FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE profiles.user_id = auth.uid() 
-      AND profiles.is_admin = true
-    )
-  );
+  USING (public.is_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "Admin can insert wallet transactions" ON wallet_transactions;
 CREATE POLICY "Admin can insert wallet transactions"
   ON wallet_transactions FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE profiles.user_id = auth.uid() 
-      AND profiles.is_admin = true
-    )
-  );
+  WITH CHECK (public.is_admin(auth.uid()));
 
 -- Function to add wallet credit
 CREATE OR REPLACE FUNCTION add_wallet_credit(
