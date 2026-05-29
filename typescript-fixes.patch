@@ -1,0 +1,54 @@
+--- a/src/components/checkout/CouponInput.tsx
++++ b/src/components/checkout/CouponInput.tsx
+@@ -99,7 +99,7 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputP
+     }
+ 
+     try {
+-      let data: any = null;
++      let data: { code: string; discount_type: string; discount_value: number; min_order_amount?: number; max_uses?: number; current_uses?: number; expires_at?: string | null } | null = null;
+ 
+       try {
+         const abortController = new AbortController();
+@@ -130,7 +130,8 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputP
+           if (raw) {
+             const parsed = JSON.parse(raw);
+             if (parsed.coupons) {
+-              const localCoupon = parsed.coupons.find((c: any) => c.code.toUpperCase() === key && c.status === 'active');
++              interface LocalCoupon { code: string; type: string; discount: string | number; minOrder?: number; usageLimit?: number; used?: number; expiresAt?: string; status: string }
++              const localCoupon = parsed.coupons.find((c: LocalCoupon) => c.code.toUpperCase() === key && c.status === 'active');
+               if (localCoupon) {
+                 data = {
+                   code: localCoupon.code,
+@@ -194,7 +195,7 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputP
+       });
+     } catch (err: unknown) {
+       console.error('Error applying coupon:', err);
+-      const errorObj = err as any;
++      const errorObj = err as { name?: string; message?: string; code?: string };
+ 
+       if (errorObj?.name === 'AbortError' || errorObj?.message?.includes('FetchError') || errorObj?.message?.includes('timed out')) {
+         setError('Network issue while verifying coupon');
+
+--- a/src/components/layout/ScrollToTop.tsx
++++ b/src/components/layout/ScrollToTop.tsx
+@@ -23,7 +23,7 @@ const ScrollToTop = () => {
+ 
+     // 2. Use rAF for the initial scroll reset — aligns with the browser paint cycle
+     // so it fires after Framer Motion's compositor layer commits, not during it.
+-    let rafId = requestAnimationFrame(() => {
++    const rafId = requestAnimationFrame(() => {
+       window.scrollTo(0, 0);
+     });
+ 
+
+--- a/src/pages/Checkout.tsx
++++ b/src/pages/Checkout.tsx
+@@ -180,7 +180,7 @@ const Checkout = () => {
+         else if (!/^\\d{10}$/.test(value)) error = 'Phone number must contain 10 digits';
+         break;
+       case 'email':
+-        if (value && !/^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$/.test(value)) error = 'Please enter a valid email address';
++        if (value && !/^[\\w-.]+@([\\w-]+\\.)+[\\w-]{2,4}$/.test(value)) error = 'Please enter a valid email address';
+         break;
+       case 'address':
+         if (!value.trim()) error = 'Delivery address is required';

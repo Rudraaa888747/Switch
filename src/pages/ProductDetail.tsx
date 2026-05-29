@@ -54,14 +54,32 @@ const ProductDetail = () => {
 
   const inWishlist = product ? isInWishlist(product.id) : false;
 
-  // Ensure any mobile scroll-lock state from overlays is cleared when entering the product page
+  // Defensive Scroll Restoration & Scroll Lock Cleanup for Mobile
   useEffect(() => {
-    document.body.dataset.mobileMenu = 'closed';
-    document.body.style.overflow = '';
-    document.body.style.touchAction = '';
-    document.documentElement.style.overflow = '';
-    document.documentElement.style.touchAction = '';
-  }, [id]);
+    if (typeof document !== 'undefined') {
+      document.body.dataset.mobileMenu = 'closed';
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.touchAction = '';
+    }
+
+    // Scroll to top immediately when product ID or loading finishes
+    window.scrollTo(0, 0);
+
+    const intervals = [30, 80, 150, 300, 450, 600, 800];
+    const timers = intervals.map(delay =>
+      setTimeout(() => {
+        window.scrollTo({
+          top: 0,
+          left: 0,
+          behavior: 'instant',
+        });
+      }, delay)
+    );
+
+    return () => timers.forEach(clearTimeout);
+  }, [id, isLoading]);
 
   useEffect(() => {
     if (id) trackBehavior(id, 'view');
@@ -194,9 +212,8 @@ const ProductDetail = () => {
 
               <motion.button
                 onClick={handleWishlistToggle}
-                className={`absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border backdrop-blur-xl transition-all duration-300 ${
-                  inWishlist ? 'border-primary bg-primary text-primary-foreground' : 'border-foreground/10 bg-background/60 text-foreground hover:border-foreground/30 hover:bg-background/80'
-                }`}
+                className={`absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border backdrop-blur-xl transition-all duration-300 ${inWishlist ? 'border-primary bg-primary text-primary-foreground' : 'border-foreground/10 bg-background/60 text-foreground hover:border-foreground/30 hover:bg-background/80'
+                  }`}
                 whileTap={{ scale: 0.94 }}
               >
                 <Heart size={18} className={inWishlist ? 'fill-current' : ''} />
@@ -207,19 +224,18 @@ const ProductDetail = () => {
               <>
                 <div className="flex items-center gap-3">
                   <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-2">
-                {currentImages.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setActiveImage(image)}
-                    className={`theme-surface h-20 w-16 flex-shrink-0 overflow-hidden rounded-[1rem] border transition-all duration-300 ${
-                      activeImage === image ? 'border-foreground ring-1 ring-foreground/20 shadow-[0_18px_36px_-26px_hsl(var(--foreground)/0.6)]' : 'border-border opacity-60 hover:opacity-100'
-                    }`}
-                  >
+                    {currentImages.map((image, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setActiveImage(image)}
+                        className={`theme-surface h-20 w-16 flex-shrink-0 overflow-hidden rounded-[1rem] border transition-all duration-300 ${activeImage === image ? 'border-foreground ring-1 ring-foreground/20 shadow-[0_18px_36px_-26px_hsl(var(--foreground)/0.6)]' : 'border-border opacity-60 hover:opacity-100'
+                          }`}
+                      >
                         <div className="theme-image-stage h-full w-full">
                           <img src={image} alt={product.name} className="h-full w-full object-cover object-[center_top] transition-transform duration-300 hover:scale-105" loading="lazy" />
                         </div>
-                  </button>
-                ))}
+                      </button>
+                    ))}
                   </div>
                   <span className="hidden flex-shrink-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[10px] text-muted-foreground sm:flex">
                     <span className="font-medium text-foreground/80">{currentImages.indexOf(activeImage) + 1}</span>
@@ -299,8 +315,7 @@ const ProductDetail = () => {
                     <button
                       key={size}
                       onClick={() => setSelectedSize(size)}
-                        className={`min-h-[3rem] rounded-[1rem] border text-sm font-medium transition-all duration-300 ${
-                          selectedSize === size ? 'border-foreground bg-foreground text-background shadow-[0_18px_34px_-24px_hsl(var(--foreground)/0.55)]' : 'border-border bg-background hover:border-foreground/40 hover:bg-muted/70 dark:hover:bg-muted/30 active:scale-95'
+                      className={`min-h-[3rem] rounded-[1rem] border text-sm font-medium transition-all duration-300 ${selectedSize === size ? 'border-foreground bg-foreground text-background shadow-[0_18px_34px_-24px_hsl(var(--foreground)/0.55)]' : 'border-border bg-background hover:border-foreground/40 hover:bg-muted/70 dark:hover:bg-muted/30 active:scale-95'
                         }`}
                     >
                       {size}
@@ -335,7 +350,7 @@ const ProductDetail = () => {
               </motion.button>
             </div>
 
-              <div className="grid grid-cols-3 gap-3 border-t border-border pt-6">
+            <div className="grid grid-cols-3 gap-3 border-t border-border pt-6">
               <div className="theme-surface rounded-[1rem] px-4 py-5 text-center">
                 <Truck className="mx-auto mb-2 h-4 w-4 text-muted-foreground" />
                 <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Free Delivery</p>
@@ -356,9 +371,8 @@ const ProductDetail = () => {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`pb-3 text-xs font-medium uppercase tracking-[0.2em] transition-all duration-300 ${
-                      activeTab === tab ? 'border-b border-foreground text-foreground' : 'border-b border-transparent text-muted-foreground hover:text-foreground/70'
-                    }`}
+                    className={`pb-3 text-xs font-medium uppercase tracking-[0.2em] transition-all duration-300 ${activeTab === tab ? 'border-b border-foreground text-foreground' : 'border-b border-transparent text-muted-foreground hover:text-foreground/70'
+                      }`}
                   >
                     {tab}
                   </button>
@@ -395,13 +409,13 @@ const ProductDetail = () => {
                         <p className="mt-1 font-medium">{product.brand || 'Premium'}</p>
                       </div>
                     </div>
-                    
+
                     <div className="border-t border-border pt-6">
                       <h4 className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Model Details</h4>
                       <p className="text-sm">Model is 6'1" (185 cm) and wears a size L.</p>
                       <p className="mt-2 text-sm text-muted-foreground">Garment fits true to size. For an oversized fit, we recommend sizing up.</p>
                     </div>
-                    
+
                     <div className="border-t border-border pt-6">
                       <h4 className="mb-3 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Material & Care</h4>
                       <ul className="list-inside list-disc space-y-1 text-sm">
@@ -423,19 +437,19 @@ const ProductDetail = () => {
         </section>
 
         <div className="space-y-16 mt-16">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, amount: 0.01 }}>
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, margin: "200px" }}>
             <SmartRecommendations currentProductId={product.id} type="similar" limit={4} />
           </motion.div>
 
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, amount: 0.01 }}>
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, margin: "200px" }}>
             <SmartRecommendations currentProductId={product.id} type="complete-look" limit={4} />
           </motion.div>
 
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, amount: 0.01 }}>
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, margin: "200px" }}>
             <SmartRecommendations type="trending" limit={4} />
           </motion.div>
 
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, amount: 0.01 }}>
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, margin: "200px" }}>
             <SmartRecommendations type="new-arrivals" limit={4} />
           </motion.div>
         </div>

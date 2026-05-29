@@ -1,0 +1,122 @@
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:178:  shipping_city TEXT NOT NULL,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:182:  subtotal INTEGER NOT NULL DEFAULT 0,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:189:  estimated_delivery DATE,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:480:  estimated_delivery_date DATE,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:727:  subtotal_amount INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_amount >= 0),
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:742:  estimated_delivery_at TIMESTAMPTZ,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:825:      subtotal_amount,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:839:      estimated_delivery_at,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:862:      COALESCE(legacy.subtotal, 0),
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:863:      GREATEST(COALESCE(legacy.subtotal, 0) + COALESCE(legacy.tax, 0) + COALESCE(legacy.shipping, 0) - COALESCE(legacy.total, 0), 0),
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:874:          'city', NULLIF(legacy.shipping_city, ''),
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:883:          'city', NULLIF(legacy.shipping_city, ''),
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:893:        WHEN legacy.estimated_delivery IS NOT NULL THEN legacy.estimated_delivery::timestamptz
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:954:      subtotal_amount,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:968:      estimated_delivery_at,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1003:        WHEN MAX(legacy.estimated_delivery_date) IS NOT NULL THEN MAX(legacy.estimated_delivery_date)::timestamptz
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1114:  subtotal_amount INTEGER,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1129:  estimated_delivery_at TIMESTAMPTZ,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1154:    orders.subtotal_amount,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1169:    orders.estimated_delivery_at,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1219:  p_estimated_delivery_at TIMESTAMPTZ DEFAULT NULL
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1237:    estimated_delivery_at = COALESCE(p_estimated_delivery_at, estimated_delivery_at),
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1282:  shipping_city text,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1286:  subtotal numeric,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1292:  estimated_delivery text,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1308:    o.shipping_city,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1312:    o.subtotal,
+D:\newwww\Switch\supabase\migrations\20240101_initial_schema.sql:1318:    o.estimated_delivery,
+D:\newwww\Switch\supabase\migrations\20240103_fix_orders_schema.sql:10:ADD COLUMN shipping_city TEXT,
+D:\newwww\Switch\supabase\migrations\20260118082023_create_orders_table.sql:10:  shipping_city TEXT NOT NULL,
+D:\newwww\Switch\supabase\migrations\20260118082023_create_orders_table.sql:14:  subtotal INTEGER NOT NULL DEFAULT 0,
+D:\newwww\Switch\supabase\migrations\20260118082023_create_orders_table.sql:21:  estimated_delivery DATE,
+D:\newwww\Switch\supabase\migrations\20260316190531_recreate_orders_as_order_items.sql:15:  estimated_delivery_date DATE,
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:192:  subtotal_amount INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_amount >= 0),
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:207:  estimated_delivery_at TIMESTAMPTZ,
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:290:      subtotal_amount,
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:304:      estimated_delivery_at,
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:327:      COALESCE(legacy.subtotal, 0),
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:328:      GREATEST(COALESCE(legacy.subtotal, 0) + COALESCE(legacy.tax, 0) + COALESCE(legacy.shipping, 0) - COALESCE(legacy.total, 0), 0),
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:339:          'city', NULLIF(legacy.shipping_city, ''),
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:348:          'city', NULLIF(legacy.shipping_city, ''),
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:358:        WHEN legacy.estimated_delivery IS NOT NULL THEN legacy.estimated_delivery::timestamptz
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:419:      subtotal_amount,
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:433:      estimated_delivery_at,
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:468:        WHEN MAX(legacy.estimated_delivery_date) IS NOT NULL THEN MAX(legacy.estimated_delivery_date)::timestamptz
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:579:  subtotal_amount INTEGER,
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:594:  estimated_delivery_at TIMESTAMPTZ,
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:619:    orders.subtotal_amount,
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:634:    orders.estimated_delivery_at,
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:684:  p_estimated_delivery_at TIMESTAMPTZ DEFAULT NULL
+D:\newwww\Switch\supabase\migrations\20260317183000_modern_orders_admin_security.sql:702:    estimated_delivery_at = COALESCE(p_estimated_delivery_at, estimated_delivery_at),
+D:\newwww\Switch\supabase\migrations\20260318133000_admin_orders_performance.sql:24:  subtotal_amount integer,
+D:\newwww\Switch\supabase\migrations\20260318133000_admin_orders_performance.sql:33:  estimated_delivery_at timestamptz,
+D:\newwww\Switch\supabase\migrations\20260318133000_admin_orders_performance.sql:50:    o.subtotal_amount,
+D:\newwww\Switch\supabase\migrations\20260318133000_admin_orders_performance.sql:59:    o.estimated_delivery_at,
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:11:ADD COLUMN IF NOT EXISTS shipping_city TEXT,
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:15:ADD COLUMN IF NOT EXISTS subtotal INTEGER NOT NULL DEFAULT 0,
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:20:ADD COLUMN IF NOT EXISTS estimated_delivery DATE;
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:26:  has_estimated_delivery_at BOOLEAN;
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:27:  has_subtotal_amount BOOLEAN;
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:55:      AND column_name = 'estimated_delivery_at'
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:56:  ) INTO has_estimated_delivery_at;
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:63:      AND column_name = 'subtotal_amount'
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:64:  ) INTO has_subtotal_amount;
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:109:        shipping_city = COALESCE(shipping_city, shipping_address::jsonb ->> ''city''),
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:112:      WHERE shipping_city IS NULL
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:118:  IF has_estimated_delivery_at THEN
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:121:      SET estimated_delivery = COALESCE(estimated_delivery, estimated_delivery_at::date)
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:122:      WHERE estimated_delivery IS NULL
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:123:        AND estimated_delivery_at IS NOT NULL
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:127:  IF has_subtotal_amount THEN
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:130:      SET subtotal = COALESCE(subtotal, subtotal_amount, 0)
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:131:      WHERE subtotal IS NULL OR subtotal = 0
+D:\newwww\Switch\supabase\migrations\20260323001000_orders_compatibility_bridge.sql:154:      SET total = COALESCE(total, grand_total_amount, subtotal + tax + shipping, 0)
+D:\newwww\Switch\supabase\migrations\20260426000000_order_wallet_hardening.sql:121:  p_estimated_delivery DATE,
+D:\newwww\Switch\supabase\migrations\20260426000000_order_wallet_hardening.sql:122:  p_subtotal DECIMAL,
+D:\newwww\Switch\supabase\migrations\20260426000000_order_wallet_hardening.sql:131:  p_shipping_city TEXT,
+D:\newwww\Switch\supabase\migrations\20260426000000_order_wallet_hardening.sql:192:    estimated_delivery,
+D:\newwww\Switch\supabase\migrations\20260426000000_order_wallet_hardening.sql:193:    subtotal,
+D:\newwww\Switch\supabase\migrations\20260426000000_order_wallet_hardening.sql:202:    shipping_city,
+D:\newwww\Switch\supabase\migrations\20260426000000_order_wallet_hardening.sql:211:    p_estimated_delivery,
+D:\newwww\Switch\supabase\migrations\20260426000000_order_wallet_hardening.sql:212:    p_subtotal,
+D:\newwww\Switch\supabase\migrations\20260426000000_order_wallet_hardening.sql:221:    p_shipping_city,
+D:\newwww\Switch\supabase\migrations\20260513000001_optimized_order_placement.sql:8:  p_estimated_delivery DATE,
+D:\newwww\Switch\supabase\migrations\20260513000001_optimized_order_placement.sql:9:  p_subtotal DECIMAL,
+D:\newwww\Switch\supabase\migrations\20260513000001_optimized_order_placement.sql:18:  p_shipping_city TEXT,
+D:\newwww\Switch\supabase\migrations\20260513000001_optimized_order_placement.sql:64:    order_id, user_id, status, estimated_delivery, subtotal, tax, shipping, total, 
+D:\newwww\Switch\supabase\migrations\20260513000001_optimized_order_placement.sql:66:    shipping_city, shipping_state, shipping_pincode, payment_method
+D:\newwww\Switch\supabase\migrations\20260513000001_optimized_order_placement.sql:69:    p_order_id, p_user_id, p_status::public.order_status, p_estimated_delivery, 
+D:\newwww\Switch\supabase\migrations\20260513000001_optimized_order_placement.sql:70:    p_subtotal, p_tax, p_shipping, p_total, p_items, p_customer_name, 
+D:\newwww\Switch\supabase\migrations\20260513000001_optimized_order_placement.sql:71:    p_customer_email, p_customer_phone, p_shipping_address, p_shipping_city, 
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:10:  p_shipping_city TEXT,
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:28:  v_subtotal DECIMAL := 0;
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:74:    v_subtotal := v_subtotal + v_item_total;
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:103:        IF v_subtotal >= COALESCE(v_coupon_min_order, 0) THEN
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:105:            v_coupon_discount := (v_subtotal * (v_coupon_discount_value / 100.0));
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:111:          IF v_subtotal > 0 THEN
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:112:            v_tax := v_tax * ((v_subtotal - v_coupon_discount) / v_subtotal);
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:123:  v_grand_total := v_subtotal - v_coupon_discount + v_tax + v_shipping;
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:145:    order_id, user_id, status, estimated_delivery, subtotal, tax, shipping, total, 
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:147:    shipping_city, shipping_state, shipping_pincode, payment_method
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:151:    v_subtotal, v_tax, v_shipping, v_grand_total, p_items, p_customer_name, 
+D:\newwww\Switch\supabase\migrations\20260526143000_secure_place_order.sql:152:    p_customer_email, p_customer_phone, p_shipping_address, p_shipping_city, 
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:17:  p_shipping_city TEXT DEFAULT NULL,
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:45:  v_subtotal DECIMAL := 0;
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:61:  v_estimated_delivery DATE;
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:78:  v_estimated_delivery := CURRENT_DATE + INTERVAL '5 days';
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:120:    -- Accumulate subtotal using DB price (not client price)
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:121:    v_subtotal := v_subtotal + (v_db_price * v_quantity);
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:153:      IF v_coupon_min_order IS NOT NULL AND v_subtotal < v_coupon_min_order THEN
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:158:        v_coupon_discount := ROUND((v_subtotal * v_coupon_value / 100)::NUMERIC, 2);
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:160:        v_coupon_discount := LEAST(v_coupon_value, v_subtotal);
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:171:  IF v_subtotal > 0 THEN
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:172:    v_tax := ROUND((v_estimated_tax * ((v_subtotal - v_coupon_discount) / v_subtotal))::NUMERIC, 2);
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:177:  v_total := ROUND((v_subtotal - v_coupon_discount + v_tax)::NUMERIC, 2);
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:217:    estimated_delivery,
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:218:    subtotal,
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:226:    shipping_city,
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:237:    v_estimated_delivery,
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:238:    v_subtotal,
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:246:    p_shipping_city,
+D:\newwww\Switch\supabase\migrations\20260527000000_production_hardening.sql:307:    'subtotal', v_subtotal,
