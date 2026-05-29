@@ -180,7 +180,7 @@ const Checkout = () => {
         else if (!/^\d{10}$/.test(value)) error = 'Phone number must contain 10 digits';
         break;
       case 'email':
-        if (value && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(value)) error = 'Please enter a valid email address';
+        if (value && !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(value)) error = 'Please enter a valid email address';
         break;
       case 'address':
         if (!value.trim()) error = 'Delivery address is required';

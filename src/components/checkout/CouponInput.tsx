@@ -99,7 +99,7 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputPr
     }
 
     try {
-      let data: any = null;
+      let data: { code: string; discount_type: string; discount_value: number; min_order_amount?: number; max_uses?: number; current_uses?: number; expires_at?: string | null } | null = null;
 
       try {
         const abortController = new AbortController();
@@ -130,7 +130,8 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputPr
           if (raw) {
             const parsed = JSON.parse(raw);
             if (parsed.coupons) {
-              const localCoupon = parsed.coupons.find((c: any) => c.code.toUpperCase() === key && c.status === 'active');
+              interface LocalCoupon { code: string; type: string; discount: string | number; minOrder?: number; usageLimit?: number; used?: number; expiresAt?: string; status: string }
+              const localCoupon = parsed.coupons.find((c: LocalCoupon) => c.code.toUpperCase() === key && c.status === 'active');
               if (localCoupon) {
                 data = {
                   code: localCoupon.code,
@@ -194,7 +195,7 @@ const CouponInput = ({ subtotal, onApplyCoupon, isAuthenticated }: CouponInputPr
       });
     } catch (err: unknown) {
       console.error('Error applying coupon:', err);
-      const errorObj = err as any;
+      const errorObj = err as { name?: string; message?: string; code?: string };
 
       if (errorObj?.name === 'AbortError' || errorObj?.message?.includes('FetchError') || errorObj?.message?.includes('timed out')) {
         setError('Network issue while verifying coupon');

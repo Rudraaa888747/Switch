@@ -255,11 +255,9 @@ const AdminProducts = () => {
 
   const addMutation = useMutation({
     mutationFn: async (newProduct: ProductFormValues) => {
-      // Explicitly omit 'id' at runtime — Postgres uses DEFAULT gen_random_uuid()
-      // Sending id:null or id:undefined overrides the DEFAULT and causes 23502 NOT NULL violation
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id: _stripId, ...safePayload } = newProduct as ProductFormValues & { id?: unknown };
-      const data = await supabaseRestInsert<ProductData[]>('products', [safePayload]);
+      // ProductFormValues already omits 'id' via Omit<ProductData, 'id'>
+      // No runtime destructuring needed — TypeScript guarantees id doesn't exist
+      const data = await supabaseRestInsert<ProductData[]>('products', [newProduct]);
       return data[0];
     },
     onSuccess: () => {
@@ -286,11 +284,10 @@ const AdminProducts = () => {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<ProductFormValues> }) => {
-      // Strip id from the updates payload — we never want to send id in a PATCH body
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id: _stripId, ...safeUpdates } = updates as Partial<ProductFormValues> & { id?: unknown };
+      // Partial<ProductFormValues> already excludes 'id' via Omit<ProductData, 'id'>
+      // No runtime destructuring needed — TypeScript guarantees id doesn't exist in updates
       const params = new URLSearchParams({ id: `eq.${id}` });
-      const data = await supabaseRestUpdate<ProductData[]>('products', safeUpdates, params);
+      const data = await supabaseRestUpdate<ProductData[]>('products', updates, params);
       return data[0];
     },
     onSuccess: () => {
@@ -533,7 +530,9 @@ const AdminProducts = () => {
 
       if (error) {
         // Surface the EXACT Supabase error — statusCode, message, error name
-        const detail = `${error.message}${(error as any).statusCode ? ` (HTTP ${(error as any).statusCode})` : ''}`;
+        interface SupabaseStorageError { message: string; statusCode?: number }
+        const storageError = error as SupabaseStorageError;
+        const detail = `${storageError.message}${storageError.statusCode ? ` (HTTP ${storageError.statusCode})` : ''}`;
         console.error('[Supabase Upload Error]', error);
         toast({
           title: 'Upload failed',
@@ -857,11 +856,11 @@ const AdminProducts = () => {
                   <form id="product-form" onSubmit={handleSubmit} className="flex flex-col lg:flex-row gap-8">
                     <div className="flex-1 min-w-0 space-y-6">
                       <div className="flex items-center gap-2 border-b border-border/50 pb-4 mb-4 overflow-x-auto custom-scrollbar">
-                        {['general', 'inventory', 'variants', 'seo'].map(tab => (
+                        {(['general', 'inventory', 'variants', 'seo'] as const).map(tab => (
                           <button
                             key={tab}
                             type="button"
-                            onClick={() => setActiveTab(tab as any)}
+                            onClick={() => setActiveTab(tab)}
                             className={`px-4 py-2 text-sm font-semibold capitalize rounded-lg transition-all ${activeTab === tab ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
                           >
                             {tab}

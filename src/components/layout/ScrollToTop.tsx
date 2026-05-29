@@ -23,7 +23,7 @@ const ScrollToTop = () => {
 
     // 2. Use rAF for the initial scroll reset — aligns with the browser paint cycle
     // so it fires after Framer Motion's compositor layer commits, not during it.
-    let rafId = requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       window.scrollTo(0, 0);
     });
 
