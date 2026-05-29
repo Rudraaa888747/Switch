@@ -13,18 +13,22 @@ CREATE TABLE IF NOT EXISTS public.cart_items (
 
 ALTER TABLE public.cart_items ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own cart" ON public.cart_items;
 CREATE POLICY "Users can view own cart"
   ON public.cart_items FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own cart" ON public.cart_items;
 CREATE POLICY "Users can insert own cart"
   ON public.cart_items FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own cart" ON public.cart_items;
 CREATE POLICY "Users can update own cart"
   ON public.cart_items FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own cart" ON public.cart_items;
 CREATE POLICY "Users can delete own cart"
   ON public.cart_items FOR DELETE
   USING (auth.uid() = user_id);
@@ -40,14 +44,17 @@ CREATE TABLE IF NOT EXISTS public.wishlist_items (
 
 ALTER TABLE public.wishlist_items ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own wishlist" ON public.wishlist_items;
 CREATE POLICY "Users can view own wishlist"
   ON public.wishlist_items FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own wishlist" ON public.wishlist_items;
 CREATE POLICY "Users can insert own wishlist"
   ON public.wishlist_items FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own wishlist" ON public.wishlist_items;
 CREATE POLICY "Users can delete own wishlist"
   ON public.wishlist_items FOR DELETE
   USING (auth.uid() = user_id);
@@ -66,10 +73,12 @@ CREATE TABLE IF NOT EXISTS public.admin_content (
 
 ALTER TABLE public.admin_content ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone can view active content" ON public.admin_content;
 CREATE POLICY "Anyone can view active content"
   ON public.admin_content FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Admin can manage content" ON public.admin_content;
 CREATE POLICY "Admin can manage content"
   ON public.admin_content FOR ALL
   USING (true)
@@ -85,10 +94,12 @@ CREATE TABLE IF NOT EXISTS public.admin_settings (
 
 ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone can view settings" ON public.admin_settings;
 CREATE POLICY "Anyone can view settings"
   ON public.admin_settings FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Admin can manage settings" ON public.admin_settings;
 CREATE POLICY "Admin can manage settings"
   ON public.admin_settings FOR ALL
   USING (true)

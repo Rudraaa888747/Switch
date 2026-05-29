@@ -45,10 +45,12 @@ CREATE INDEX IF NOT EXISTS idx_wallet_transactions_type ON wallet_transactions(t
 ALTER TABLE wallet_transactions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for wallet_transactions
+DROP POLICY IF EXISTS "Users can view own wallet transactions" ON wallet_transactions;
 CREATE POLICY "Users can view own wallet transactions"
   ON wallet_transactions FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admin can view all wallet transactions" ON wallet_transactions;
 CREATE POLICY "Admin can view all wallet transactions"
   ON wallet_transactions FOR SELECT
   USING (
@@ -59,6 +61,7 @@ CREATE POLICY "Admin can view all wallet transactions"
     )
   );
 
+DROP POLICY IF EXISTS "Admin can insert wallet transactions" ON wallet_transactions;
 CREATE POLICY "Admin can insert wallet transactions"
   ON wallet_transactions FOR INSERT
   WITH CHECK (
