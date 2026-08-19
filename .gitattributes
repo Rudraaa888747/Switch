@@ -1,0 +1,1 @@
+supabase/migrations/consolidated_migration.sql filter=lfs diff=lfs merge=lfs -text

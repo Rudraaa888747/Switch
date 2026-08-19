@@ -1,0 +1,10 @@
+project_id = "pinbdhfnkdzwvmazbtrj"
+
+[functions.chat-assistant]
+verify_jwt = false
+
+[functions.style-analysis]
+verify_jwt = false
+
+[functions.outfit-matching]
+verify_jwt = false

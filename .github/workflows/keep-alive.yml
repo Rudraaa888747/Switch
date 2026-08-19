@@ -1,0 +1,28 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    # Runs every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          echo "Pinging Supabase REST API to prevent auto-pausing..."
+          RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" \
+            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/products?select=id&limit=1")
+          
+          echo "Response HTTP Code: $RESPONSE_CODE"
+          
+          if [ "$RESPONSE_CODE" -ge 200 ] && [ "$RESPONSE_CODE" -lt 300 ]; then
+            echo "Ping successful!"
+          else
+            echo "Ping failed with HTTP code $RESPONSE_CODE"
+            exit 1
+          fi
