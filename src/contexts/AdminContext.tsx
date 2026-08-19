@@ -110,21 +110,35 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('display_name, avatar_url')
+          const { data: adminData, error: adminError } = await supabase
+            .from('admin_users')
+            .select('role')
             .eq('user_id', session.user.id)
-            .maybeSingle();
+            .eq('is_active', true)
+            .single();
 
-          setIsAdminAuthenticated(true);
-          setAdminName(profile?.display_name || session.user.email?.split('@')[0] || 'Demo Admin');
-          setAdminRole('super_admin');
-          setAdminAvatar(profile?.avatar_url || null);
+          if (adminError || !adminData) {
+            setIsAdminAuthenticated(false);
+            setAdminName(null);
+            setAdminRole('support');
+            setAdminAvatar(null);
+          } else {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('display_name, avatar_url')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+
+            setIsAdminAuthenticated(true);
+            setAdminName(profile?.display_name || session.user.email?.split('@')[0] || 'Admin');
+            setAdminRole(adminData.role as 'super_admin' | 'manager' | 'editor' | 'support');
+            setAdminAvatar(profile?.avatar_url || null);
+          }
         } else {
           setIsAdminAuthenticated(false);
         }
       } catch (error) {
-        console.error('Error verifying demo admin session:', error);
+        console.error('Error verifying admin session:', error);
         setIsAdminAuthenticated(false);
       } finally {
         setIsLoading(false);

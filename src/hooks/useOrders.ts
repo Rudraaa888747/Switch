@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRestSelect } from '@/integrations/supabase/publicRest';
 import { applyRealtimeOrderChange, groupOrders, normalizeOrders, ORDER_LIST_SELECT_COLUMNS, OrderGroup } from '@/lib/orders';
+import { withAuthRetry } from '@/lib/withAuthRetry';
 
 export const getUserOrdersQueryKey = (userId?: string | null) => ['user-orders', userId ?? 'guest'];
 
@@ -13,7 +14,9 @@ export const fetchUserOrders = async (userId: string, accessToken?: string | nul
     order: 'created_at.desc',
   });
 
-  const data = await supabaseRestSelect<Record<string, unknown>[]>('orders', params, accessToken);
+  const data = await withAuthRetry(() =>
+    supabaseRestSelect<Record<string, unknown>[]>('orders', params, accessToken)
+  );
 
   return groupOrders(normalizeOrders((data || []) as Record<string, unknown>[]));
 };

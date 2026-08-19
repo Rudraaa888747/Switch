@@ -21,6 +21,8 @@ const createSupabaseClient = () => {
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
       lock: noOpLock,
+      autoRefreshToken: true,
+      persistSession: true,
     },
   });
 };

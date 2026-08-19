@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { mapDbProductToProduct, DbProduct } from '@/hooks/useProducts';
 import { toast } from '@/hooks/use-toast';
+import { withAuthRetrySupabase } from '@/lib/withAuthRetry';
 
 interface WishlistContextType {
   items: Product[];
@@ -50,10 +51,12 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
 
     const loadServer = async () => {
       try {
-        const { data: serverItems, error: serverItemsError } = await supabase
-          .from('wishlist_items')
-          .select('product_id')
-          .eq('user_id', user.id);
+        const { data: serverItems, error: serverItemsError } = await withAuthRetrySupabase(() =>
+          supabase
+            .from('wishlist_items')
+            .select('product_id')
+            .eq('user_id', user.id)
+        );
         if (serverItemsError) throw serverItemsError;
 
         if (serverItems && serverItems.length > 0) {
@@ -69,10 +72,12 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
           const missingIds = Array.from(serverIds).filter(id => !merged.find(m => m.id === id));
 
           if (missingIds.length > 0) {
-            const { data: missingProducts, error: missingProductsError } = await supabase
-              .from('products')
-              .select('*')
-              .in('id', missingIds);
+            const { data: missingProducts, error: missingProductsError } = await withAuthRetrySupabase(() =>
+              supabase
+                .from('products')
+                .select('*')
+                .in('id', missingIds)
+            );
             if (missingProductsError) throw missingProductsError;
 
             if (missingProducts) {
@@ -84,11 +89,12 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
 
           setItems(merged);
         }
-        setSynced(true);
-        initialLoadDone.current = true;
       } catch (err) {
         console.error("Failed to load server wishlist:", err);
         toast({ title: 'Wishlist sync failed', description: 'Your wishlist could not be loaded. Please try again.', variant: 'destructive' });
+      } finally {
+        setSynced(true);
+        initialLoadDone.current = true;
       }
     };
 
